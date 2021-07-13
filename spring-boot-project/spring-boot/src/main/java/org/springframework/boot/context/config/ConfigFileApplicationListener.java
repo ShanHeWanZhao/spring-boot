@@ -101,7 +101,8 @@ import org.springframework.util.StringUtils;
  * <p>
  * The 'spring.config.name' property can be used to specify an alternative name to load
  * and the 'spring.config.location' property can be used to specify alternative search
- * locations or specific files.
+ * locations or specific files. <p/>
+ * 加载配置文件的listener，在Environment准备好了会调用，来加载和激活指定的配置文件
  * <p>
  *
  * @author Dave Syer
@@ -196,7 +197,9 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 	}
 
 	private void onApplicationEnvironmentPreparedEvent(ApplicationEnvironmentPreparedEvent event) {
+		// 加载spring.factories里的EnvironmentPostProcessor
 		List<EnvironmentPostProcessor> postProcessors = loadPostProcessors();
+		// 再加上自己
 		postProcessors.add(this);
 		AnnotationAwareOrderComparator.sort(postProcessors);
 		for (EnvironmentPostProcessor postProcessor : postProcessors) {
@@ -314,6 +317,10 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 
 		private final ResourceLoader resourceLoader;
 
+		/**
+		 * 有两种：PropertiesPropertySourceLoader和YamlPropertySourceLoader，
+		 * 分别支持properties,xml和yml文件的解析
+		 */
 		private final List<PropertySourceLoader> propertySourceLoaders;
 
 		private Deque<Profile> profiles;
@@ -330,6 +337,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			this.environment = environment;
 			this.placeholdersResolver = new PropertySourcesPlaceholdersResolver(this.environment);
 			this.resourceLoader = (resourceLoader != null) ? resourceLoader : new DefaultResourceLoader(null);
+			// 加载spring.factories里的PropertySourceLoader
 			this.propertySourceLoaders = SpringFactoriesLoader.loadFactories(PropertySourceLoader.class,
 					getClass().getClassLoader());
 		}

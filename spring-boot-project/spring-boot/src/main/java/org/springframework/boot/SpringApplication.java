@@ -296,26 +296,45 @@ public class SpringApplication {
 	 * @return a running {@link ApplicationContext}
 	 */
 	public ConfigurableApplicationContext run(String... args) {
+		// 计时器
 		StopWatch stopWatch = new StopWatch();
 		stopWatch.start();
 		ConfigurableApplicationContext context = null;
+		// 配置headless模式（https://jimolonely.github.io/2019/03/26/java/039-java-headless/）
 		configureHeadlessProperty();
+		// 配置SpringApplicationRunListener，准备发布监听各种事件
 		SpringApplicationRunListeners listeners = getRunListeners(args);
+		// 发布 springboot开始启动 事件
 		listeners.starting();
 		try {
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+			// 实例化Environment，并且发布Environment准备好的事件
+			// cloud环境下，BootstrapApplicationListener就会启动来监听这个事件，以此来准备父上下文
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+			// 配置系统属性spring.beaninfo.ignore 默认为true
 			configureIgnoreBeanInfo(environment);
 			Banner printedBanner = printBanner(environment);
+			// 创建ApplicationContext（servlet模式里还会配置通用注解处理器和包扫描器）
 			context = createApplicationContext();
+			// ApplicationContextInitializer的调用，加载启动类的BeanDefinition（非asm加载，为StandardAnnotationMetadata）
 			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+			// 最重要的一部
+			// 1. shutdownHook的注册（用来清除bean缓存，调用DisposableBean 等）
+			// 2. 创建并调用beanFactoryPostProcessor,BeanDefinitionRegistryPostProcessor。创建BeanPostProcessor等待bean实例化调用
+			// 3. 国际化处理，事件广播，注册各种ApplicationListener等
+			// 4. web环境的初始化
+			// 5. 实例化非lazy bean
 			refreshContext(context);
+			// 钩子函数，交给子类去实现
 			afterRefresh(context, applicationArguments);
+			// 计时结束
 			stopWatch.stop();
 			if (this.logStartupInfo) {
 				new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
 			}
+			// publish springboot启动完成事件
 			listeners.started(context);
+			// 调用ApplicationRunner和CommandLineRunner bean
 			callRunners(context, applicationArguments);
 		}
 		catch (Throwable ex) {

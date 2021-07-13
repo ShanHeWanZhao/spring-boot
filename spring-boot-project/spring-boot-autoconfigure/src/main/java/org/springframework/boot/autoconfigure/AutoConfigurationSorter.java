@@ -52,6 +52,11 @@ class AutoConfigurationSorter {
 		this.autoConfigurationMetadata = autoConfigurationMetadata;
 	}
 
+	/**
+	 * 对自动配置类排序（@AutoConfigureOrder、 @AutoConfigureBefore、@AutoConfigureAfter这三个注解的处理）
+	 * @param classNames
+	 * @return
+	 */
 	List<String> getInPriorityOrder(Collection<String> classNames) {
 		AutoConfigurationClasses classes = new AutoConfigurationClasses(this.metadataReaderFactory,
 				this.autoConfigurationMetadata, classNames);
@@ -59,6 +64,7 @@ class AutoConfigurationSorter {
 		// Initially sort alphabetically
 		Collections.sort(orderedClassNames);
 		// Then sort by order
+		// 先按@AutoConfigureOrder注解排
 		orderedClassNames.sort((o1, o2) -> {
 			int i1 = classes.get(o1).getOrder();
 			int i2 = classes.get(o2).getOrder();
@@ -70,11 +76,14 @@ class AutoConfigurationSorter {
 	}
 
 	private List<String> sortByAnnotation(AutoConfigurationClasses classes, List<String> classNames) {
+		// 待排集
 		List<String> toSort = new ArrayList<>(classNames);
 		toSort.addAll(classes.getAllNames());
+		// 已排集
 		Set<String> sorted = new LinkedHashSet<>();
+		// 正在处理中的集
 		Set<String> processing = new LinkedHashSet<>();
-		while (!toSort.isEmpty()) {
+		while (!toSort.isEmpty()) { // 待排集不为空，就一直排下去
 			doSortByAfterAnnotation(classes, toSort, sorted, processing, null);
 		}
 		sorted.retainAll(classNames);

@@ -120,12 +120,19 @@ public class AutoConfigurationImportSelector implements DeferredImportSelector, 
 			return EMPTY_ENTRY;
 		}
 		AnnotationAttributes attributes = getAttributes(annotationMetadata);
+		// 加载所有配置在classpath下META-INF/spring.factories里的EnableAutoConfiguration
 		List<String> configurations = getCandidateConfigurations(annotationMetadata, attributes);
+		// 移除重复的
 		configurations = removeDuplicates(configurations);
+		// 获取exclude的
 		Set<String> exclusions = getExclusions(annotationMetadata, attributes);
+		// 检查排除的。如果存在，但本来就不会自动配置，就抛异常
 		checkExcludedClasses(configurations, exclusions);
+		// 移除排除的
 		configurations.removeAll(exclusions);
+		// @OnWebApplicationCondition、@OnClassCondition、@OnBeanCondition 进行解析和过滤
 		configurations = getConfigurationClassFilter().filter(configurations);
+		// 广播事件
 		fireAutoConfigurationImportEvents(configurations, exclusions);
 		return new AutoConfigurationEntry(configurations, exclusions);
 	}
