@@ -52,9 +52,25 @@ public abstract class Launcher {
 		if (!isExploded()) {
 			JarFile.registerUrlProtocolHandler();
 		}
+		// 创建LaunchedURLClassLoader类加载器
+		/*
+			jvm三大类加载器加载路径：
+			1.BootstrapClassLoader : System.getProperty("sun.boot.class.path") -- 主要是rt.jar的class
+			1.ExtClassLoader : System.getProperty("java.ext.dirs") -- 主要是jdk里lib/ext目录下的jar
+			1.AppClassLoader : System.getProperty("java.class.path") --classpath的class（我们写的class）
+
+			总结一下，为什么需要这个自定义的LaunchedURLClassLoader来加载class：
+			springboot以jar包方式运行时，项目的其他依赖jar其实都已经整合到这个jar包里了，
+				就在 BOOT-INF/lib/ 目录下，它不同于其他maven项目，本质就是jar包的嵌套。
+			如果我们用jdk的类加载器加载项目中的其他三方包是根本找不到的，因为这些三方包不在classpath下，
+			spring自定义了LaunchedURLClassLoader，并且启动时将所有 BOOT-INF/lib/ 目录下的jar以URL的形式保存，这样在加载三方class
+			时，就会在LaunchedURLClassLoader保存的URL种去查找，再加载
+		 */
 		ClassLoader classLoader = createClassLoader(getClassPathArchivesIterator());
 		String jarMode = System.getProperty("jarmode");
+		// 获取Start-Class，也就是我们主程序的启动类
 		String launchClass = (jarMode != null && !jarMode.isEmpty()) ? JAR_MODE_LAUNCHER : getMainClass();
+		// 设置LaunchedURLClassLoader到当前thread的环境中，以便在后续加载class时使用到，并启动主启动类
 		launch(args, launchClass, classLoader);
 	}
 
@@ -152,6 +168,7 @@ public abstract class Launcher {
 		ProtectionDomain protectionDomain = getClass().getProtectionDomain();
 		CodeSource codeSource = protectionDomain.getCodeSource();
 		URI location = (codeSource != null) ? codeSource.getLocation().toURI() : null;
+		// path就是当前启动jar包的全路径
 		String path = (location != null) ? location.getSchemeSpecificPart() : null;
 		if (path == null) {
 			throw new IllegalStateException("Unable to determine code source archive");
