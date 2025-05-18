@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,15 @@
 
 package org.springframework.boot.actuate.autoconfigure.metrics;
 
+import java.io.File;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
 /**
@@ -30,6 +34,7 @@ import org.springframework.boot.context.properties.NestedConfigurationProperty;
  * @author Jon Schneider
  * @author Alexander Abramov
  * @author Tadaya Tsuyukubo
+ * @author Chris Bono
  * @since 2.0.0
  */
 @ConfigurationProperties("management.metrics")
@@ -44,7 +49,7 @@ public class MetricsProperties {
 
 	/**
 	 * Whether meter IDs starting with the specified name should be enabled. The longest
-	 * match wins, the key `all` can also be used to configure all meters.
+	 * match wins, the key 'all' can also be used to configure all meters.
 	 */
 	private final Map<String, Boolean> enable = new LinkedHashMap<>();
 
@@ -54,6 +59,12 @@ public class MetricsProperties {
 	private final Map<String, String> tags = new LinkedHashMap<>();
 
 	private final Web web = new Web();
+
+	private final Data data = new Data();
+
+	private final Graphql graphql = new Graphql();
+
+	private final System system = new System();
 
 	private final Distribution distribution = new Distribution();
 
@@ -75,6 +86,18 @@ public class MetricsProperties {
 
 	public Web getWeb() {
 		return this.web;
+	}
+
+	public Data getData() {
+		return this.data;
+	}
+
+	public Graphql getGraphql() {
+		return this.graphql;
+	}
+
+	public System getSystem() {
+		return this.system;
 	}
 
 	public Distribution getDistribution() {
@@ -214,20 +237,98 @@ public class MetricsProperties {
 
 	}
 
+	public static class Data {
+
+		private final Repository repository = new Repository();
+
+		public Repository getRepository() {
+			return this.repository;
+		}
+
+		public static class Repository {
+
+			/**
+			 * Name of the metric for sent requests.
+			 */
+			private String metricName = "spring.data.repository.invocations";
+
+			/**
+			 * Auto-timed request settings.
+			 */
+			@NestedConfigurationProperty
+			private final AutoTimeProperties autotime = new AutoTimeProperties();
+
+			public String getMetricName() {
+				return this.metricName;
+			}
+
+			public void setMetricName(String metricName) {
+				this.metricName = metricName;
+			}
+
+			public AutoTimeProperties getAutotime() {
+				return this.autotime;
+			}
+
+		}
+
+	}
+
+	public static class Graphql {
+
+		/**
+		 * Auto-timed queries settings.
+		 */
+		@NestedConfigurationProperty
+		private final AutoTimeProperties autotime = new AutoTimeProperties();
+
+		public AutoTimeProperties getAutotime() {
+			return this.autotime;
+		}
+
+	}
+
+	public static class System {
+
+		private final Diskspace diskspace = new Diskspace();
+
+		public Diskspace getDiskspace() {
+			return this.diskspace;
+		}
+
+		public static class Diskspace {
+
+			/**
+			 * Comma-separated list of paths to report disk metrics for.
+			 */
+			private List<File> paths = new ArrayList<>(Collections.singletonList(new File(".")));
+
+			public List<File> getPaths() {
+				return this.paths;
+			}
+
+			public void setPaths(List<File> paths) {
+				this.paths = paths;
+			}
+
+		}
+
+	}
+
 	public static class Distribution {
 
 		/**
 		 * Whether meter IDs starting with the specified name should publish percentile
 		 * histograms. For monitoring systems that support aggregable percentile
 		 * calculation based on a histogram, this can be set to true. For other systems,
-		 * this has no effect. The longest match wins, the key `all` can also be used to
+		 * this has no effect. The longest match wins, the key 'all' can also be used to
 		 * configure all meters.
 		 */
 		private final Map<String, Boolean> percentilesHistogram = new LinkedHashMap<>();
 
 		/**
 		 * Specific computed non-aggregable percentiles to ship to the backend for meter
-		 * IDs starting-with the specified name. The longest match wins, the key `all` can
+		 * IDs starting-with the specified name. The longest match wins, the key 'all' can
 		 * also be used to configure all meters.
 		 */
 		private final Map<String, double[]> percentiles = new LinkedHashMap<>();
@@ -235,24 +336,39 @@ public class MetricsProperties {
 		/**
 		 * Specific service-level objective boundaries for meter IDs starting with the
 		 * specified name. The longest match wins. Counters will be published for each
-		 * specified boundary. Values can be specified as a long or as a Duration value
+		 * specified boundary. Values can be specified as a double or as a Duration value
 		 * (for timer meters, defaulting to ms if no unit specified).
 		 */
 		private final Map<String, ServiceLevelObjectiveBoundary[]> slo = new LinkedHashMap<>();
 
 		/**
 		 * Minimum value that meter IDs starting with the specified name are expected to
-		 * observe. The longest match wins. Values can be specified as a long or as a
+		 * observe. The longest match wins. Values can be specified as a double or as a
 		 * Duration value (for timer meters, defaulting to ms if no unit specified).
 		 */
 		private final Map<String, String> minimumExpectedValue = new LinkedHashMap<>();
 
 		/**
 		 * Maximum value that meter IDs starting with the specified name are expected to
-		 * observe. The longest match wins. Values can be specified as a long or as a
+		 * observe. The longest match wins. Values can be specified as a double or as a
 		 * Duration value (for timer meters, defaulting to ms if no unit specified).
 		 */
 		private final Map<String, String> maximumExpectedValue = new LinkedHashMap<>();
+
+		/**
+		 * Maximum amount of time that samples for meter IDs starting with the specified
+		 * name are accumulated to decaying distribution statistics before they are reset
+		 * and rotated. The longest match wins, the key `all` can also be used to
+		 * configure all meters.
+		 */
+		private final Map<String, Duration> expiry = new LinkedHashMap<>();
+
+		/**
+		 * Number of histograms for meter IDs starting with the specified name to keep in
+		 * the ring buffer. The longest match wins, the key `all` can also be used to
+		 * configure all meters.
+		 */
+		private final Map<String, Integer> bufferLength = new LinkedHashMap<>();
 
 		public Map<String, Boolean> getPercentilesHistogram() {
 			return this.percentilesHistogram;
@@ -260,12 +376,6 @@ public class MetricsProperties {
 
 		public Map<String, double[]> getPercentiles() {
 			return this.percentiles;
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "management.metrics.distribution.slo")
-		public Map<String, ServiceLevelObjectiveBoundary[]> getSla() {
-			return this.slo;
 		}
 
 		public Map<String, ServiceLevelObjectiveBoundary[]> getSlo() {
@@ -278,6 +388,14 @@ public class MetricsProperties {
 
 		public Map<String, String> getMaximumExpectedValue() {
 			return this.maximumExpectedValue;
+		}
+
+		public Map<String, Duration> getExpiry() {
+			return this.expiry;
+		}
+
+		public Map<String, Integer> getBufferLength() {
+			return this.bufferLength;
 		}
 
 	}

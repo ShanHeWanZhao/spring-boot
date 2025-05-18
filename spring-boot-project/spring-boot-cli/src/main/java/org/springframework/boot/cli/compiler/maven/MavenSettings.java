@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import org.apache.maven.model.ActivationProperty;
 import org.apache.maven.model.building.ModelProblemCollector;
 import org.apache.maven.model.building.ModelProblemCollectorRequest;
 import org.apache.maven.model.path.DefaultPathTranslator;
+import org.apache.maven.model.path.ProfileActivationFilePathInterpolator;
 import org.apache.maven.model.profile.DefaultProfileSelector;
 import org.apache.maven.model.profile.ProfileActivationContext;
 import org.apache.maven.model.profile.activation.FileProfileActivator;
@@ -93,7 +94,7 @@ public class MavenSettings {
 	private MirrorSelector createMirrorSelector(Settings settings) {
 		DefaultMirrorSelector selector = new DefaultMirrorSelector();
 		for (Mirror mirror : settings.getMirrors()) {
-			selector.add(mirror.getId(), mirror.getUrl(), mirror.getLayout(), false, mirror.getMirrorOf(),
+			selector.add(mirror.getId(), mirror.getUrl(), mirror.getLayout(), false, false, mirror.getMirrorOf(),
 					mirror.getMirrorOfLayouts());
 		}
 		return selector;
@@ -114,7 +115,8 @@ public class MavenSettings {
 		DefaultProxySelector selector = new DefaultProxySelector();
 		for (Proxy proxy : decryptedSettings.getProxies()) {
 			Authentication authentication = new AuthenticationBuilder().addUsername(proxy.getUsername())
-					.addPassword(proxy.getPassword()).build();
+				.addPassword(proxy.getPassword())
+				.build();
 			selector.add(new org.eclipse.aether.repository.Proxy(proxy.getProtocol(), proxy.getHost(), proxy.getPort(),
 					authentication), proxy.getNonProxyHosts());
 		}
@@ -172,8 +174,10 @@ public class MavenSettings {
 
 	private DefaultProfileSelector createProfileSelector() {
 		DefaultProfileSelector selector = new DefaultProfileSelector();
-
-		selector.addProfileActivator(new FileProfileActivator().setPathTranslator(new DefaultPathTranslator()));
+		ProfileActivationFilePathInterpolator profileActivationFilePathInterpolator = new ProfileActivationFilePathInterpolator();
+		profileActivationFilePathInterpolator.setPathTranslator(new DefaultPathTranslator());
+		selector.addProfileActivator(new FileProfileActivator()
+			.setProfileActivationFilePathInterpolator(profileActivationFilePathInterpolator));
 		selector.addProfileActivator(new JdkVersionProfileActivator());
 		selector.addProfileActivator(new PropertyProfileActivator());
 		selector.addProfileActivator(new OperatingSystemProfileActivator());

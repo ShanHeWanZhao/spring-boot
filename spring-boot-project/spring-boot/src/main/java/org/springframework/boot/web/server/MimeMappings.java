@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ public final class MimeMappings implements Iterable<MimeMappings.Mapping> {
 		mappings.add("otg", "application/vnd.oasis.opendocument.graphics-template");
 		mappings.add("oth", "application/vnd.oasis.opendocument.text-web");
 		mappings.add("otp", "application/vnd.oasis.opendocument.presentation-template");
-		mappings.add("ots", "application/vnd.oasis.opendocument.spreadsheet-template ");
+		mappings.add("ots", "application/vnd.oasis.opendocument.spreadsheet-template");
 		mappings.add("ott", "application/vnd.oasis.opendocument.text-template");
 		mappings.add("ogx", "application/ogg");
 		mappings.add("ogv", "video/ogg");
@@ -203,6 +203,7 @@ public final class MimeMappings implements Iterable<MimeMappings.Mapping> {
 		mappings.add("xul", "application/vnd.mozilla.xul+xml");
 		mappings.add("xwd", "image/x-xwindowdump");
 		mappings.add("vsd", "application/vnd.visio");
+		mappings.add("wasm", "application/wasm");
 		mappings.add("wav", "audio/x-wav");
 		mappings.add("wbmp", "image/vnd.wap.wbmp");
 		mappings.add("wml", "text/vnd.wap.wml");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import org.springframework.boot.context.properties.DeprecatedConfigurationProper
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.boot.web.server.Compression;
+import org.springframework.boot.web.server.Cookie;
 import org.springframework.boot.web.server.Http2;
 import org.springframework.boot.web.server.Shutdown;
 import org.springframework.boot.web.server.Ssl;
@@ -67,6 +68,7 @@ import org.springframework.util.unit.DataSize;
  * @author HaiTao Zhang
  * @author Victor Mandujano
  * @author Chris Bono
+ * @author Parviz Rozikov
  * @since 1.0.0
  */
 @ConfigurationProperties(prefix = "server", ignoreUnknownFields = true)
@@ -115,6 +117,8 @@ public class ServerProperties {
 	private final Http2 http2 = new Http2();
 
 	private final Servlet servlet = new Servlet();
+
+	private final Reactive reactive = new Reactive();
 
 	private final Tomcat tomcat = new Tomcat();
 
@@ -188,6 +192,10 @@ public class ServerProperties {
 		return this.servlet;
 	}
 
+	public Reactive getReactive() {
+		return this.reactive;
+	}
+
 	public Tomcat getTomcat() {
 		return this.tomcat;
 	}
@@ -213,7 +221,7 @@ public class ServerProperties {
 	}
 
 	/**
-	 * Servlet properties.
+	 * Servlet server properties.
 	 */
 	public static class Servlet {
 
@@ -297,6 +305,45 @@ public class ServerProperties {
 	}
 
 	/**
+	 * Reactive server properties.
+	 */
+	public static class Reactive {
+
+		private final Session session = new Session();
+
+		public Session getSession() {
+			return this.session;
+		}
+
+		public static class Session {
+
+			/**
+			 * Session timeout. If a duration suffix is not specified, seconds will be
+			 * used.
+			 */
+			@DurationUnit(ChronoUnit.SECONDS)
+			private Duration timeout = Duration.ofMinutes(30);
+
+			@NestedConfigurationProperty
+			private final Cookie cookie = new Cookie();
+
+			public Duration getTimeout() {
+				return this.timeout;
+			}
+
+			public void setTimeout(Duration timeout) {
+				this.timeout = timeout;
+			}
+
+			public Cookie getCookie() {
+				return this.cookie;
+			}
+
+		}
+
+	}
+
+	/**
 	 * Tomcat properties.
 	 */
 	public static class Tomcat {
@@ -372,6 +419,19 @@ public class ServerProperties {
 		private int processorCache = 200;
 
 		/**
+		 * Time to wait for another HTTP request before the connection is closed. When not
+		 * set the connectionTimeout is used. When set to -1 there will be no timeout.
+		 */
+		private Duration keepAliveTimeout;
+
+		/**
+		 * Maximum number of HTTP requests that can be pipelined before the connection is
+		 * closed. When set to 0 or 1, keep-alive and pipelining are disabled. When set to
+		 * -1, an unlimited number of pipelined or keep-alive requests are allowed.
+		 */
+		private int maxKeepAliveRequests = 100;
+
+		/**
 		 * Comma-separated list of additional patterns that match jars to ignore for TLD
 		 * scanning. The special '?' and '*' characters can be used in the pattern to
 		 * match one and only one character and zero or more characters respectively.
@@ -397,6 +457,12 @@ public class ServerProperties {
 		private Duration connectionTimeout;
 
 		/**
+		 * Whether to reject requests with illegal header names or values.
+		 */
+		@Deprecated
+		private boolean rejectIllegalHeader = true;
+
+		/**
 		 * Static resource configuration.
 		 */
 		private final Resource resource = new Resource();
@@ -410,28 +476,6 @@ public class ServerProperties {
 		 * Remote Ip Valve configuration.
 		 */
 		private final Remoteip remoteip = new Remoteip();
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.threads.max")
-		public int getMaxThreads() {
-			return getThreads().getMax();
-		}
-
-		@Deprecated
-		public void setMaxThreads(int maxThreads) {
-			getThreads().setMax(maxThreads);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.threads.min-spare")
-		public int getMinSpareThreads() {
-			return getThreads().getMinSpare();
-		}
-
-		@Deprecated
-		public void setMinSpareThreads(int minSpareThreads) {
-			getThreads().setMinSpare(minSpareThreads);
-		}
 
 		public DataSize getMaxHttpFormPostSize() {
 			return this.maxHttpFormPostSize;
@@ -465,72 +509,6 @@ public class ServerProperties {
 			this.basedir = basedir;
 		}
 
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.remoteip.internal-proxies")
-		@Deprecated
-		public String getInternalProxies() {
-			return this.remoteip.getInternalProxies();
-		}
-
-		@Deprecated
-		public void setInternalProxies(String internalProxies) {
-			this.remoteip.setInternalProxies(internalProxies);
-		}
-
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.remoteip.protocol-header")
-		@Deprecated
-		public String getProtocolHeader() {
-			return this.remoteip.getProtocolHeader();
-		}
-
-		@Deprecated
-		public void setProtocolHeader(String protocolHeader) {
-			this.remoteip.setProtocolHeader(protocolHeader);
-		}
-
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.remoteip.protocol-header-https-value")
-		@Deprecated
-		public String getProtocolHeaderHttpsValue() {
-			return this.remoteip.getProtocolHeaderHttpsValue();
-		}
-
-		@Deprecated
-		public void setProtocolHeaderHttpsValue(String protocolHeaderHttpsValue) {
-			this.remoteip.setProtocolHeaderHttpsValue(protocolHeaderHttpsValue);
-		}
-
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.remoteip.host-header")
-		@Deprecated
-		public String getHostHeader() {
-			return this.remoteip.getHostHeader();
-		}
-
-		@Deprecated
-		public void setHostHeader(String hostHeader) {
-			this.remoteip.setHostHeader(hostHeader);
-		}
-
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.remote.port-header")
-		@Deprecated
-		public String getPortHeader() {
-			return this.remoteip.getPortHeader();
-		}
-
-		@Deprecated
-		public void setPortHeader(String portHeader) {
-			this.remoteip.setPortHeader(portHeader);
-		}
-
-		@DeprecatedConfigurationProperty(replacement = "server.tomcat.remoteip.remote-ip-header")
-		@Deprecated
-		public String getRemoteIpHeader() {
-			return this.remoteip.getRemoteIpHeader();
-		}
-
-		@Deprecated
-		public void setRemoteIpHeader(String remoteIpHeader) {
-			this.remoteip.setRemoteIpHeader(remoteIpHeader);
-		}
-
 		public Boolean getRedirectContextRoot() {
 			return this.redirectContextRoot;
 		}
@@ -539,22 +517,12 @@ public class ServerProperties {
 			this.redirectContextRoot = redirectContextRoot;
 		}
 
-		@Deprecated
-		public Boolean getUseRelativeRedirects() {
-			return this.useRelativeRedirects;
-		}
-
 		public boolean isUseRelativeRedirects() {
 			return this.useRelativeRedirects;
 		}
 
 		public void setUseRelativeRedirects(boolean useRelativeRedirects) {
 			this.useRelativeRedirects = useRelativeRedirects;
-		}
-
-		@Deprecated
-		public void setUseRelativeRedirects(Boolean useRelativeRedirects) {
-			this.useRelativeRedirects = (useRelativeRedirects != null) ? useRelativeRedirects : false;
 		}
 
 		public Charset getUriEncoding() {
@@ -597,6 +565,22 @@ public class ServerProperties {
 			this.processorCache = processorCache;
 		}
 
+		public Duration getKeepAliveTimeout() {
+			return this.keepAliveTimeout;
+		}
+
+		public void setKeepAliveTimeout(Duration keepAliveTimeout) {
+			this.keepAliveTimeout = keepAliveTimeout;
+		}
+
+		public int getMaxKeepAliveRequests() {
+			return this.maxKeepAliveRequests;
+		}
+
+		public void setMaxKeepAliveRequests(int maxKeepAliveRequests) {
+			this.maxKeepAliveRequests = maxKeepAliveRequests;
+		}
+
 		public List<String> getAdditionalTldSkipPatterns() {
 			return this.additionalTldSkipPatterns;
 		}
@@ -627,6 +611,15 @@ public class ServerProperties {
 
 		public void setConnectionTimeout(Duration connectionTimeout) {
 			this.connectionTimeout = connectionTimeout;
+		}
+
+		@DeprecatedConfigurationProperty(reason = "The setting has been deprecated in Tomcat")
+		public boolean isRejectIllegalHeader() {
+			return this.rejectIllegalHeader;
+		}
+
+		public void setRejectIllegalHeader(boolean rejectIllegalHeader) {
+			this.rejectIllegalHeader = rejectIllegalHeader;
 		}
 
 		public Resource getResource() {
@@ -697,7 +690,7 @@ public class ServerProperties {
 			private String locale;
 
 			/**
-			 * Whether to check for log file existence so it can be recreated it if an
+			 * Whether to check for log file existence so it can be recreated if an
 			 * external process has renamed it.
 			 */
 			private boolean checkExists = false;
@@ -969,8 +962,13 @@ public class ServerProperties {
 					+ "192\\.168\\.\\d{1,3}\\.\\d{1,3}|" // 192.168/16
 					+ "169\\.254\\.\\d{1,3}\\.\\d{1,3}|" // 169.254/16
 					+ "127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|" // 127/8
+					+ "100\\.6[4-9]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
+					+ "100\\.[7-9]{1}\\d{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
+					+ "100\\.1[0-1]{1}\\d{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
+					+ "100\\.12[0-7]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 100.64.0.0/10
 					+ "172\\.1[6-9]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 172.16/12
-					+ "172\\.2[0-9]{1}\\.\\d{1,3}\\.\\d{1,3}|172\\.3[0-1]{1}\\.\\d{1,3}\\.\\d{1,3}|" //
+					+ "172\\.2[0-9]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 172.16/12
+					+ "172\\.3[0-1]{1}\\.\\d{1,3}\\.\\d{1,3}|" // 172.16/12
 					+ "0:0:0:0:0:0:0:1|::1";
 
 			/**
@@ -996,7 +994,7 @@ public class ServerProperties {
 
 			/**
 			 * Name of the HTTP header from which the remote IP is extracted. For
-			 * instance, `X-FORWARDED-FOR`.
+			 * instance, 'X-FORWARDED-FOR'.
 			 */
 			private String remoteIpHeader;
 
@@ -1091,72 +1089,6 @@ public class ServerProperties {
 
 		public void setMaxHttpFormPostSize(DataSize maxHttpFormPostSize) {
 			this.maxHttpFormPostSize = maxHttpFormPostSize;
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.jetty.threads.acceptors")
-		public Integer getAcceptors() {
-			return getThreads().getAcceptors();
-		}
-
-		@Deprecated
-		public void setAcceptors(Integer acceptors) {
-			getThreads().setAcceptors(acceptors);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.jetty.threads.selectors")
-		public Integer getSelectors() {
-			return getThreads().getSelectors();
-		}
-
-		@Deprecated
-		public void setSelectors(Integer selectors) {
-			getThreads().setSelectors(selectors);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.jetty.threads.min")
-		public Integer getMinThreads() {
-			return getThreads().getMin();
-		}
-
-		@Deprecated
-		public void setMinThreads(Integer minThreads) {
-			getThreads().setMin(minThreads);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.jetty.threads.max")
-		public Integer getMaxThreads() {
-			return getThreads().getMax();
-		}
-
-		@Deprecated
-		public void setMaxThreads(Integer maxThreads) {
-			getThreads().setMax(maxThreads);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.jetty.threads.max-queue-capacity")
-		public Integer getMaxQueueCapacity() {
-			return getThreads().getMaxQueueCapacity();
-		}
-
-		@Deprecated
-		public void setMaxQueueCapacity(Integer maxQueueCapacity) {
-			getThreads().setMaxQueueCapacity(maxQueueCapacity);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.jetty.threads.idle-timeout")
-		public Duration getThreadIdleTimeout() {
-			return getThreads().getIdleTimeout();
-		}
-
-		@Deprecated
-		public void setThreadIdleTimeout(Duration threadIdleTimeout) {
-			getThreads().setIdleTimeout(threadIdleTimeout);
 		}
 
 		public Duration getConnectionIdleTimeout() {
@@ -1418,9 +1350,21 @@ public class ServerProperties {
 		private DataSize maxInitialLineLength = DataSize.ofKilobytes(4);
 
 		/**
+		 * Maximum number of requests that can be made per connection. By default, a
+		 * connection serves unlimited number of requests.
+		 */
+		private Integer maxKeepAliveRequests;
+
+		/**
 		 * Whether to validate headers when decoding requests.
 		 */
 		private boolean validateHeaders = true;
+
+		/**
+		 * Idle timeout of the Netty channel. When not specified, an infinite timeout is
+		 * used.
+		 */
+		private Duration idleTimeout;
 
 		public Duration getConnectionTimeout() {
 			return this.connectionTimeout;
@@ -1462,12 +1406,28 @@ public class ServerProperties {
 			this.maxInitialLineLength = maxInitialLineLength;
 		}
 
+		public Integer getMaxKeepAliveRequests() {
+			return this.maxKeepAliveRequests;
+		}
+
+		public void setMaxKeepAliveRequests(Integer maxKeepAliveRequests) {
+			this.maxKeepAliveRequests = maxKeepAliveRequests;
+		}
+
 		public boolean isValidateHeaders() {
 			return this.validateHeaders;
 		}
 
 		public void setValidateHeaders(boolean validateHeaders) {
 			this.validateHeaders = validateHeaders;
+		}
+
+		public Duration getIdleTimeout() {
+			return this.idleTimeout;
+		}
+
+		public void setIdleTimeout(Duration idleTimeout) {
+			this.idleTimeout = idleTimeout;
 		}
 
 	}
@@ -1579,28 +1539,6 @@ public class ServerProperties {
 			this.bufferSize = bufferSize;
 		}
 
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.undertow.threads.io")
-		public Integer getIoThreads() {
-			return getThreads().getIo();
-		}
-
-		@Deprecated
-		public void setIoThreads(Integer ioThreads) {
-			getThreads().setIo(ioThreads);
-		}
-
-		@Deprecated
-		@DeprecatedConfigurationProperty(replacement = "server.undertow.threads.worker")
-		public Integer getWorkerThreads() {
-			return getThreads().getWorker();
-		}
-
-		@Deprecated
-		public void setWorkerThreads(Integer workerThreads) {
-			getThreads().setWorker(workerThreads);
-		}
-
 		public Boolean getDirectBuffers() {
 			return this.directBuffers;
 		}
@@ -1641,10 +1579,13 @@ public class ServerProperties {
 			this.maxCookies = maxCookies;
 		}
 
+		@Deprecated
+		@DeprecatedConfigurationProperty(reason = "This option was interpreted improperly")
 		public boolean isAllowEncodedSlash() {
 			return this.allowEncodedSlash;
 		}
 
+		@Deprecated
 		public void setAllowEncodedSlash(boolean allowEncodedSlash) {
 			this.allowEncodedSlash = allowEncodedSlash;
 		}
@@ -1822,8 +1763,14 @@ public class ServerProperties {
 
 		public static class Options {
 
+			/**
+			 * Socket options as defined in org.xnio.Options.
+			 */
 			private Map<String, String> socket = new LinkedHashMap<>();
 
+			/**
+			 * Server options as defined in io.undertow.UndertowOptions.
+			 */
 			private Map<String, String> server = new LinkedHashMap<>();
 
 			public Map<String, String> getServer() {

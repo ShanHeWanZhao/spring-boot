@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ import org.springframework.core.log.LogMessage;
 import org.springframework.util.Assert;
 
 /**
- * A collection of {@link ConfigDataLoader} instances loaded via {@code spring.factories}.
+ * A collection of {@link ConfigDataLoader} instances loaded through
+ * {@code spring.factories}.
  *
  * @author Phillip Webb
  * @author Madhura Bhave
@@ -51,19 +52,23 @@ class ConfigDataLoaders {
 	 * Create a new {@link ConfigDataLoaders} instance.
 	 * @param logFactory the deferred log factory
 	 * @param bootstrapContext the bootstrap context
+	 * @param classLoader the class loader used when loading
 	 */
-	ConfigDataLoaders(DeferredLogFactory logFactory, ConfigurableBootstrapContext bootstrapContext) {
-		this(logFactory, bootstrapContext, SpringFactoriesLoader.loadFactoryNames(ConfigDataLoader.class, null));
+	ConfigDataLoaders(DeferredLogFactory logFactory, ConfigurableBootstrapContext bootstrapContext,
+			ClassLoader classLoader) {
+		this(logFactory, bootstrapContext, classLoader,
+				SpringFactoriesLoader.loadFactoryNames(ConfigDataLoader.class, classLoader));
 	}
 
 	/**
 	 * Create a new {@link ConfigDataLoaders} instance.
 	 * @param logFactory the deferred log factory
 	 * @param bootstrapContext the bootstrap context
+	 * @param classLoader the class loader used when loading
 	 * @param names the {@link ConfigDataLoader} class names instantiate
 	 */
 	ConfigDataLoaders(DeferredLogFactory logFactory, ConfigurableBootstrapContext bootstrapContext,
-			List<String> names) {
+			ClassLoader classLoader, List<String> names) {
 		this.logger = logFactory.getLog(getClass());
 		Instantiator<ConfigDataLoader<?>> instantiator = new Instantiator<>(ConfigDataLoader.class,
 				(availableParameters) -> {
@@ -73,7 +78,7 @@ class ConfigDataLoaders {
 					availableParameters.add(BootstrapContext.class, bootstrapContext);
 					availableParameters.add(BootstrapRegistry.class, bootstrapContext);
 				});
-		this.loaders = instantiator.instantiate(names);
+		this.loaders = instantiator.instantiate(classLoader, names);
 		this.resourceTypes = getResourceTypes(this.loaders);
 	}
 

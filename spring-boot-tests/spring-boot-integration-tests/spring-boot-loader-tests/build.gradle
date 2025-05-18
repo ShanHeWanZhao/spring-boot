@@ -2,13 +2,13 @@ plugins {
 	id "java"
 	id "org.springframework.boot.conventions"
 	id "org.springframework.boot.integration-test"
+	id "de.undercouch.download"
 }
 
 description = "Spring Boot Loader Integration Tests"
 
-toolchain {
-	maximumCompatibleJavaVersion = JavaLanguageVersion.of(15)
-}
+def oracleJdkVersion = "17.0.8"
+def oracleJdkArch = "aarch64".equalsIgnoreCase(System.getProperty("os.arch")) ? "aarch64" : "x64"
 
 configurations {
 	app
@@ -31,12 +31,9 @@ task syncMavenRepository(type: Sync) {
 	into "${buildDir}/int-test-maven-repository"
 }
 
-task syncAppSource(type: Sync) {
-	from "spring-boot-loader-tests-app"
-	into "${buildDir}/spring-boot-loader-tests-app"
-	filter { line ->
-		line.replace("id \"org.springframework.boot\"", "id \"org.springframework.boot\" version \"${project.version}\"")
-	}
+task syncAppSource(type: org.springframework.boot.build.SyncAppSource) {
+	sourceDirectory = file("spring-boot-loader-tests-app")
+	destinationDirectory = file("${buildDir}/spring-boot-loader-tests-app")
 }
 
 task buildApp(type: GradleBuild) {
@@ -44,6 +41,26 @@ task buildApp(type: GradleBuild) {
 	dir = "${buildDir}/spring-boot-loader-tests-app"
 	startParameter.buildCacheEnabled = false
 	tasks  = ["build"]
+}
+
+task downloadJdk(type: Download) {
+	def destFolder = new File(project.gradle.gradleUserHomeDir, "caches/springboot/downloads/jdk/oracle")
+	destFolder.mkdirs()
+	src "https://download.oracle.com/java/17/archive/jdk-${oracleJdkVersion}_linux-${oracleJdkArch}_bin.tar.gz"
+	dest destFolder
+	tempAndMove true
+	overwrite false
+}
+
+task syncJdkDownloads(type: Sync) {
+	dependsOn downloadJdk
+	from "${project.gradle.gradleUserHomeDir}/caches/springboot/downloads/jdk/oracle/"
+	include "jdk-${oracleJdkVersion}_linux-${oracleJdkArch}_bin.tar.gz"
+	into "${project.buildDir}/downloads/jdk/oracle/"
+}
+
+processIntTestResources {
+	dependsOn syncJdkDownloads
 }
 
 intTest {

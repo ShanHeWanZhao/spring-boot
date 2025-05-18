@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,19 +77,19 @@ class HealthEndpointConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	HealthContributorRegistry healthContributorRegistry(ApplicationContext applicationContext,
-			HealthEndpointGroups groups) {
-		Map<String, HealthContributor> healthContributors = new LinkedHashMap<>(
-				applicationContext.getBeansOfType(HealthContributor.class));
+			HealthEndpointGroups groups, Map<String, HealthContributor> healthContributors,
+			Map<String, ReactiveHealthContributor> reactiveHealthContributors) {
 		if (ClassUtils.isPresent("reactor.core.publisher.Flux", applicationContext.getClassLoader())) {
-			healthContributors.putAll(new AdaptedReactiveHealthContributors(applicationContext).get());
+			healthContributors.putAll(new AdaptedReactiveHealthContributors(reactiveHealthContributors).get());
 		}
 		return new AutoConfiguredHealthContributorRegistry(healthContributors, groups.getNames());
 	}
 
 	@Bean
 	@ConditionalOnMissingBean
-	HealthEndpoint healthEndpoint(HealthContributorRegistry registry, HealthEndpointGroups groups) {
-		return new HealthEndpoint(registry, groups);
+	HealthEndpoint healthEndpoint(HealthContributorRegistry registry, HealthEndpointGroups groups,
+			HealthEndpointProperties properties) {
+		return new HealthEndpoint(registry, groups, properties.getLogging().getSlowIndicatorThreshold());
 	}
 
 	@Bean
@@ -102,7 +102,7 @@ class HealthEndpointConfiguration {
 	 * {@link BeanPostProcessor} to invoke {@link HealthEndpointGroupsPostProcessor}
 	 * beans.
 	 */
-	private static class HealthEndpointGroupsBeanPostProcessor implements BeanPostProcessor {
+	static class HealthEndpointGroupsBeanPostProcessor implements BeanPostProcessor {
 
 		private final ObjectProvider<HealthEndpointGroupsPostProcessor> postProcessors;
 
@@ -120,7 +120,7 @@ class HealthEndpointConfiguration {
 
 		private Object applyPostProcessors(HealthEndpointGroups bean) {
 			for (HealthEndpointGroupsPostProcessor postProcessor : this.postProcessors.orderedStream()
-					.toArray(HealthEndpointGroupsPostProcessor[]::new)) {
+				.toArray(HealthEndpointGroupsPostProcessor[]::new)) {
 				bean = postProcessor.postProcessHealthEndpointGroups(bean);
 			}
 			return bean;
@@ -136,10 +136,9 @@ class HealthEndpointConfiguration {
 
 		private final Map<String, HealthContributor> adapted;
 
-		AdaptedReactiveHealthContributors(ApplicationContext applicationContext) {
+		AdaptedReactiveHealthContributors(Map<String, ReactiveHealthContributor> reactiveContributors) {
 			Map<String, HealthContributor> adapted = new LinkedHashMap<>();
-			applicationContext.getBeansOfType(ReactiveHealthContributor.class)
-					.forEach((name, contributor) -> adapted.put(name, adapt(contributor)));
+			reactiveContributors.forEach((name, contributor) -> adapted.put(name, adapt(contributor)));
 			this.adapted = Collections.unmodifiableMap(adapted);
 		}
 

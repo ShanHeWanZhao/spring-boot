@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -146,7 +146,8 @@ public class JmsProperties {
 		private AcknowledgeMode acknowledgeMode;
 
 		/**
-		 * Minimum number of concurrent consumers.
+		 * Minimum number of concurrent consumers. When max-concurrency is not specified
+		 * the minimum will also be used as the maximum.
 		 */
 		private Integer concurrency;
 
@@ -198,8 +199,7 @@ public class JmsProperties {
 			if (this.concurrency == null) {
 				return (this.maxConcurrency != null) ? "1-" + this.maxConcurrency : null;
 			}
-			return ((this.maxConcurrency != null) ? this.concurrency + "-" + this.maxConcurrency
-					: String.valueOf(this.concurrency));
+			return this.concurrency + "-" + ((this.maxConcurrency != null) ? this.maxConcurrency : this.concurrency);
 		}
 
 		public Duration getReceiveTimeout() {
@@ -324,7 +324,7 @@ public class JmsProperties {
 	 *
 	 * <p>
 	 * {@link javax.jms.Session#SESSION_TRANSACTED} is not defined as we take care of this
-	 * already via a call to {@code setSessionTransacted}.
+	 * already through a call to {@code setSessionTransacted}.
 	 */
 	public enum AcknowledgeMode {
 

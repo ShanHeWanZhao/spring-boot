@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.PropertySource;
@@ -119,6 +120,13 @@ public final class ConfigData {
 	public interface PropertySourceOptions {
 
 		/**
+		 * {@link PropertySourceOptions} instance that always returns
+		 * {@link Options#NONE}.
+		 * @since 2.4.6
+		 */
+		PropertySourceOptions ALWAYS_NONE = new AlwaysPropertySourceOptions(Options.NONE);
+
+		/**
 		 * Return the options that should apply for the given property source.
 		 * @param propertySource the property source
 		 * @return the options to apply
@@ -142,6 +150,9 @@ public final class ConfigData {
 		 * @return a new {@link PropertySourceOptions} instance
 		 */
 		static PropertySourceOptions always(Options options) {
+			if (options == Options.NONE) {
+				return ALWAYS_NONE;
+			}
 			return new AlwaysPropertySourceOptions(options);
 		}
 
@@ -175,7 +186,7 @@ public final class ConfigData {
 		/**
 		 * No options.
 		 */
-		public static final Options NONE = Options.of();
+		public static final Options NONE = new Options(Collections.emptySet());
 
 		private final Set<Option> options;
 
@@ -224,10 +235,24 @@ public final class ConfigData {
 		 * @param option the option to exclude
 		 * @return a new {@link Options} instance
 		 */
-		Options without(Option option) {
+		public Options without(Option option) {
+			return copy((options) -> options.remove(option));
+		}
+
+		/**
+		 * Create a new {@link Options} instance that contains the options in this set
+		 * including the given option.
+		 * @param option the option to include
+		 * @return a new {@link Options} instance
+		 */
+		public Options with(Option option) {
+			return copy((options) -> options.add(option));
+		}
+
+		private Options copy(Consumer<EnumSet<Option>> processor) {
 			EnumSet<Option> options = EnumSet.noneOf(Option.class);
 			options.addAll(this.options);
-			options.remove(option);
+			processor.accept(options);
 			return new Options(options);
 		}
 
@@ -238,8 +263,10 @@ public final class ConfigData {
 		 */
 		public static Options of(Option... options) {
 			Assert.notNull(options, "Options must not be null");
-			return new Options(
-					(options.length != 0) ? EnumSet.copyOf(Arrays.asList(options)) : EnumSet.noneOf(Option.class));
+			if (options.length == 0) {
+				return NONE;
+			}
+			return new Options(EnumSet.copyOf(Arrays.asList(options)));
 		}
 
 	}

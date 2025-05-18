@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,19 @@
 
 package org.springframework.boot.build.bom.bomr.github;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.HttpClientErrorException.Forbidden;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -50,19 +56,30 @@ final class StandardGitHubRepository implements GitHubRepository {
 			requestBody.put("labels", labels);
 		}
 		requestBody.put("body", body);
-		ResponseEntity<Map> response = this.rest.postForEntity("issues", requestBody, Map.class);
-		return (Integer) response.getBody().get("number");
+		try {
+			ResponseEntity<Map> response = this.rest.postForEntity("issues", requestBody, Map.class);
+			// See gh-30304
+			sleep(Duration.ofSeconds(3));
+			return (Integer) response.getBody().get("number");
+		}
+		catch (RestClientException ex) {
+			if (ex instanceof Forbidden) {
+				System.out.println("Received 403 response with headers " + ((Forbidden) ex).getResponseHeaders());
+			}
+			throw ex;
+		}
 	}
 
 	@Override
-	public List<String> getLabels() {
-		return get("labels?per_page=100", (label) -> (String) label.get("name"));
+	public Set<String> getLabels() {
+		return new HashSet<>(get("labels?per_page=100", (label) -> (String) label.get("name")));
 	}
 
 	@Override
 	public List<Milestone> getMilestones() {
-		return get("milestones?per_page=100",
-				(milestone) -> new Milestone((String) milestone.get("title"), (Integer) milestone.get("number")));
+		return get("milestones?per_page=100", (milestone) -> new Milestone((String) milestone.get("title"),
+				(Integer) milestone.get("number"),
+				(milestone.get("due_on") != null) ? OffsetDateTime.parse((String) milestone.get("due_on")) : null));
 	}
 
 	@Override
@@ -70,7 +87,8 @@ final class StandardGitHubRepository implements GitHubRepository {
 		return get(
 				"issues?per_page=100&state=all&labels=" + String.join(",", labels) + "&milestone="
 						+ milestone.getNumber(),
-				(issue) -> new Issue(this.rest, (Integer) issue.get("number"), (String) issue.get("title")));
+				(issue) -> new Issue(this.rest, (Integer) issue.get("number"), (String) issue.get("title"),
+						Issue.State.of((String) issue.get("state"))));
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -78,6 +96,15 @@ final class StandardGitHubRepository implements GitHubRepository {
 		ResponseEntity<List> response = this.rest.getForEntity(name, List.class);
 		List<Map<String, Object>> body = response.getBody();
 		return body.stream().map(mapper).collect(Collectors.toList());
+	}
+
+	private static void sleep(Duration duration) {
+		try {
+			Thread.sleep(duration.toMillis());
+		}
+		catch (InterruptedException ex) {
+			Thread.currentThread().interrupt();
+		}
 	}
 
 }

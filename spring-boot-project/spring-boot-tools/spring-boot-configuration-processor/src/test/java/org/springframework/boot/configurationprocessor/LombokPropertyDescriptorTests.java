@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import org.springframework.boot.configurationsample.lombok.LombokExplicitPropert
 import org.springframework.boot.configurationsample.lombok.LombokInnerClassProperties;
 import org.springframework.boot.configurationsample.lombok.LombokSimpleDataProperties;
 import org.springframework.boot.configurationsample.lombok.LombokSimpleProperties;
+import org.springframework.boot.configurationsample.lombok.LombokSimpleValueProperties;
 import org.springframework.boot.configurationsample.simple.SimpleProperties;
 import org.springframework.boot.configurationsample.specific.InnerClassProperties;
 
@@ -115,6 +116,16 @@ class LombokPropertyDescriptorTests extends PropertyDescriptorTests {
 	}
 
 	@Test
+	void lombokSimplePropertyWithOnlyGetterOnValueClassShouldNotBeExposed() throws IOException {
+		process(LombokSimpleValueProperties.class, (roundEnv, metadataEnv) -> {
+			TypeElement ownerElement = roundEnv.getRootElement(LombokSimpleValueProperties.class);
+			LombokPropertyDescriptor property = createPropertyDescriptor(ownerElement, "ignored");
+			assertThat(property.isProperty(metadataEnv)).isFalse();
+			assertThat(property.isNested(metadataEnv)).isFalse();
+		});
+	}
+
+	@Test
 	void lombokSimplePropertyWithOnlyGetterOnFieldShouldNotBeExposed() throws IOException {
 		process(LombokExplicitProperties.class, (roundEnv, metadataEnv) -> {
 			TypeElement ownerElement = roundEnv.getRootElement(LombokExplicitProperties.class);
@@ -139,8 +150,12 @@ class LombokPropertyDescriptorTests extends PropertyDescriptorTests {
 		process(LombokSimpleProperties.class, (roundEnv, metadataEnv) -> {
 			TypeElement ownerElement = roundEnv.getRootElement(LombokSimpleProperties.class);
 			LombokPropertyDescriptor property = createPropertyDescriptor(ownerElement, "description");
-			assertItemMetadata(metadataEnv, property).isProperty().hasName("test.description").hasType(String.class)
-					.hasSourceType(LombokSimpleProperties.class).hasNoDescription().isNotDeprecated();
+			assertItemMetadata(metadataEnv, property).isProperty()
+				.hasName("test.description")
+				.hasType(String.class)
+				.hasSourceType(LombokSimpleProperties.class)
+				.hasNoDescription()
+				.isNotDeprecated();
 		});
 	}
 
@@ -149,9 +164,12 @@ class LombokPropertyDescriptorTests extends PropertyDescriptorTests {
 		process(LombokSimpleProperties.class, (roundEnv, metadataEnv) -> {
 			TypeElement ownerElement = roundEnv.getRootElement(LombokSimpleProperties.class);
 			LombokPropertyDescriptor property = createPropertyDescriptor(ownerElement, "items");
-			assertItemMetadata(metadataEnv, property).isProperty().hasName("test.items")
-					.hasType("java.util.List<java.lang.String>").hasSourceType(LombokSimpleProperties.class)
-					.hasNoDescription().isNotDeprecated();
+			assertItemMetadata(metadataEnv, property).isProperty()
+				.hasName("test.items")
+				.hasType("java.util.List<java.lang.String>")
+				.hasSourceType(LombokSimpleProperties.class)
+				.hasNoDescription()
+				.isNotDeprecated();
 		});
 	}
 
@@ -163,10 +181,13 @@ class LombokPropertyDescriptorTests extends PropertyDescriptorTests {
 			ExecutableElement getter = getMethod(ownerElement, "getThird");
 			LombokPropertyDescriptor property = new LombokPropertyDescriptor(ownerElement, null, field, "third",
 					field.asType(), getter, null);
-			assertItemMetadata(metadataEnv, property).isGroup().hasName("test.third")
-					.hasType("org.springframework.boot.configurationsample.lombok.SimpleLombokPojo")
-					.hasSourceType(LombokInnerClassProperties.class).hasSourceMethod("getThird()").hasNoDescription()
-					.isNotDeprecated();
+			assertItemMetadata(metadataEnv, property).isGroup()
+				.hasName("test.third")
+				.hasType("org.springframework.boot.configurationsample.lombok.SimpleLombokPojo")
+				.hasSourceType(LombokInnerClassProperties.class)
+				.hasSourceMethod("getThird()")
+				.hasNoDescription()
+				.isNotDeprecated();
 		});
 	}
 
@@ -175,10 +196,13 @@ class LombokPropertyDescriptorTests extends PropertyDescriptorTests {
 		process(LombokInnerClassProperties.class, (roundEnv, metadataEnv) -> {
 			TypeElement ownerElement = roundEnv.getRootElement(LombokInnerClassProperties.class);
 			LombokPropertyDescriptor property = createPropertyDescriptor(ownerElement, "first");
-			assertItemMetadata(metadataEnv, property).isGroup().hasName("test.first")
-					.hasType("org.springframework.boot.configurationsample.lombok.LombokInnerClassProperties$Foo")
-					.hasSourceType(LombokInnerClassProperties.class).hasSourceMethod(null).hasNoDescription()
-					.isNotDeprecated();
+			assertItemMetadata(metadataEnv, property).isGroup()
+				.hasName("test.first")
+				.hasType("org.springframework.boot.configurationsample.lombok.LombokInnerClassProperties$Foo")
+				.hasSourceType(LombokInnerClassProperties.class)
+				.hasSourceMethod(null)
+				.hasNoDescription()
+				.isNotDeprecated();
 		});
 	}
 

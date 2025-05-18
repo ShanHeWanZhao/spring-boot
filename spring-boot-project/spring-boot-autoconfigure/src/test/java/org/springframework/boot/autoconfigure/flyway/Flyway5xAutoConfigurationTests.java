@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 package org.springframework.boot.autoconfigure.flyway;
 
+import java.util.UUID;
+
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.Location;
 import org.flywaydb.core.api.MigrationVersion;
@@ -23,7 +25,7 @@ import org.flywaydb.core.api.migration.JavaMigration;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.jdbc.EmbeddedDataSourceConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.testsupport.classpath.ClassPathOverrides;
 import org.springframework.context.annotation.Bean;
@@ -40,24 +42,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 class Flyway5xAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(FlywayAutoConfiguration.class))
-			.withPropertyValues("spring.datasource.generate-unique-name=true");
+		.withConfiguration(AutoConfigurations.of(FlywayAutoConfiguration.class))
+		.withPropertyValues("spring.datasource.url:jdbc:hsqldb:mem:" + UUID.randomUUID());
 
 	@Test
 	void defaultFlyway() {
-		this.contextRunner.withUserConfiguration(EmbeddedDataSourceConfiguration.class).run((context) -> {
+		this.contextRunner.withUserConfiguration(DataSourceAutoConfiguration.class).run((context) -> {
 			assertThat(context).hasSingleBean(Flyway.class);
 			Flyway flyway = context.getBean(Flyway.class);
 			assertThat(flyway.getConfiguration().getLocations())
-					.containsExactly(new Location("classpath:db/migration"));
+				.containsExactly(new Location("classpath:db/migration"));
 		});
 	}
 
 	@Test
 	void flywayJavaMigrationsAreIgnored() {
 		this.contextRunner
-				.withUserConfiguration(EmbeddedDataSourceConfiguration.class, FlywayJavaMigrationsConfiguration.class)
-				.run((context) -> assertThat(context).hasNotFailed());
+			.withUserConfiguration(DataSourceAutoConfiguration.class, FlywayJavaMigrationsConfiguration.class)
+			.run((context) -> assertThat(context).hasNotFailed());
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -114,6 +116,11 @@ class Flyway5xAutoConfigurationTests {
 		@Override
 		public void migrate(org.flywaydb.core.api.migration.Context context) {
 
+		}
+
+		@Override
+		public boolean isBaselineMigration() {
+			return false;
 		}
 
 	}

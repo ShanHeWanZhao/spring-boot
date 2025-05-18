@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.boot.actuate.metrics.web.servlet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.micrometer.core.annotation.Timed;
@@ -76,6 +77,9 @@ class LongTaskTimingHandlerInterceptorTests {
 	@Autowired
 	private CyclicBarrier callableBarrier;
 
+	@Autowired
+	private FaultyWebMvcTagsProvider tagsProvider;
+
 	private MockMvc mvc;
 
 	@BeforeEach
@@ -86,11 +90,12 @@ class LongTaskTimingHandlerInterceptorTests {
 	@Test
 	void asyncRequestThatThrowsUncheckedException() throws Exception {
 		MvcResult result = this.mvc.perform(get("/api/c1/completableFutureException"))
-				.andExpect(request().asyncStarted()).andReturn();
+			.andExpect(request().asyncStarted())
+			.andReturn();
 		assertThat(this.registry.get("my.long.request.exception").longTaskTimer().activeTasks()).isEqualTo(1);
 		assertThatExceptionOfType(NestedServletException.class)
-				.isThrownBy(() -> this.mvc.perform(asyncDispatch(result)))
-				.withRootCauseInstanceOf(RuntimeException.class);
+			.isThrownBy(() -> this.mvc.perform(asyncDispatch(result)))
+			.withRootCauseInstanceOf(RuntimeException.class);
 		assertThat(this.registry.get("my.long.request.exception").longTaskTimer().activeTasks()).isEqualTo(0);
 	}
 
@@ -99,8 +104,8 @@ class LongTaskTimingHandlerInterceptorTests {
 		AtomicReference<MvcResult> result = new AtomicReference<>();
 		Thread backgroundRequest = new Thread(() -> {
 			try {
-				result.set(
-						this.mvc.perform(get("/api/c1/callable/10")).andExpect(request().asyncStarted()).andReturn());
+				result
+					.set(this.mvc.perform(get("/api/c1/callable/10")).andExpect(request().asyncStarted()).andReturn());
 			}
 			catch (Exception ex) {
 				fail("Failed to execute async request", ex);
@@ -109,12 +114,32 @@ class LongTaskTimingHandlerInterceptorTests {
 		backgroundRequest.start();
 		this.callableBarrier.await();
 		assertThat(this.registry.get("my.long.request").tags("region", "test").longTaskTimer().activeTasks())
-				.isEqualTo(1);
+			.isEqualTo(1);
 		this.callableBarrier.await();
 		backgroundRequest.join();
 		this.mvc.perform(asyncDispatch(result.get())).andExpect(status().isOk());
 		assertThat(this.registry.get("my.long.request").tags("region", "test").longTaskTimer().activeTasks())
-				.isEqualTo(0);
+			.isEqualTo(0);
+	}
+
+	@Test
+	void whenMetricsRecordingFailsResponseIsUnaffected() throws Exception {
+		this.tagsProvider.failOnce();
+		AtomicReference<MvcResult> result = new AtomicReference<>();
+		Thread backgroundRequest = new Thread(() -> {
+			try {
+				result
+					.set(this.mvc.perform(get("/api/c1/callable/10")).andExpect(request().asyncStarted()).andReturn());
+			}
+			catch (Exception ex) {
+				fail("Failed to execute async request", ex);
+			}
+		});
+		backgroundRequest.start();
+		this.callableBarrier.await(10, TimeUnit.SECONDS);
+		this.callableBarrier.await(10, TimeUnit.SECONDS);
+		backgroundRequest.join();
+		this.mvc.perform(asyncDispatch(result.get())).andExpect(status().isOk());
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -138,13 +163,17 @@ class LongTaskTimingHandlerInterceptorTests {
 		}
 
 		@Bean
-		WebMvcConfigurer handlerInterceptorConfigurer(MeterRegistry meterRegistry) {
+		FaultyWebMvcTagsProvider webMvcTagsProvider() {
+			return new FaultyWebMvcTagsProvider();
+		}
+
+		@Bean
+		WebMvcConfigurer handlerInterceptorConfigurer(MeterRegistry meterRegistry, WebMvcTagsProvider tagsProvider) {
 			return new WebMvcConfigurer() {
 
 				@Override
 				public void addInterceptors(InterceptorRegistry registry) {
-					registry.addInterceptor(
-							new LongTaskTimingHandlerInterceptor(meterRegistry, new DefaultWebMvcTagsProvider()));
+					registry.addInterceptor(new LongTaskTimingHandlerInterceptor(meterRegistry, tagsProvider));
 				}
 
 			};

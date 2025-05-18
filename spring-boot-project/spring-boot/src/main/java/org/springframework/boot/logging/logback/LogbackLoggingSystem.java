@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,7 +151,7 @@ public class LogbackLoggingSystem extends Slf4JLoggingSystem {
 		new LogbackLoggingSystemProperties(environment, context::putProperty).apply(logFile);
 		LogbackConfigurator configurator = debug ? new DebugLogbackConfigurator(context)
 				: new LogbackConfigurator(context);
-		new DefaultLogbackConfiguration(initializationContext, logFile).apply(configurator);
+		new DefaultLogbackConfiguration(logFile).apply(configurator);
 		context.setPackagingDataEnabled(true);
 	}
 
@@ -167,17 +167,28 @@ public class LogbackLoggingSystem extends Slf4JLoggingSystem {
 		catch (Exception ex) {
 			throw new IllegalStateException("Could not initialize Logback logging from " + location, ex);
 		}
-		List<Status> statuses = loggerContext.getStatusManager().getCopyOfStatusList();
+		reportConfigurationErrorsIfNecessary(loggerContext);
+	}
+
+	private void reportConfigurationErrorsIfNecessary(LoggerContext loggerContext) {
 		StringBuilder errors = new StringBuilder();
-		for (Status status : statuses) {
+		List<Throwable> suppressedExceptions = new ArrayList<>();
+		for (Status status : loggerContext.getStatusManager().getCopyOfStatusList()) {
 			if (status.getLevel() == Status.ERROR) {
 				errors.append((errors.length() > 0) ? String.format("%n") : "");
 				errors.append(status.toString());
+				if (status.getThrowable() != null) {
+					suppressedExceptions.add(status.getThrowable());
+				}
 			}
 		}
-		if (errors.length() > 0) {
-			throw new IllegalStateException(String.format("Logback configuration error detected: %n%s", errors));
+		if (errors.length() == 0) {
+			return;
 		}
+		IllegalStateException ex = new IllegalStateException(
+				String.format("Logback configuration error detected: %n%s", errors));
+		suppressedExceptions.forEach(ex::addSuppressed);
+		throw ex;
 	}
 
 	private void configureByResourceUrl(LoggingInitializationContext initializationContext, LoggerContext loggerContext,
@@ -281,7 +292,7 @@ public class LogbackLoggingSystem extends Slf4JLoggingSystem {
 
 	@Override
 	public Runnable getShutdownHandler() {
-		return new ShutdownHandler();
+		return () -> getLoggerContext().stop();
 	}
 
 	private ch.qos.logback.classic.Logger getLogger(String name) {
@@ -328,22 +339,13 @@ public class LogbackLoggingSystem extends Slf4JLoggingSystem {
 		loggerContext.removeObject(LoggingSystem.class.getName());
 	}
 
-	private final class ShutdownHandler implements Runnable {
-
-		@Override
-		public void run() {
-			getLoggerContext().stop();
-		}
-
-	}
-
 	/**
 	 * {@link LoggingSystemFactory} that returns {@link LogbackLoggingSystem} if possible.
 	 */
 	@Order(Ordered.LOWEST_PRECEDENCE)
 	public static class Factory implements LoggingSystemFactory {
 
-		private static final boolean PRESENT = ClassUtils.isPresent("ch.qos.logback.core.Appender",
+		private static final boolean PRESENT = ClassUtils.isPresent("ch.qos.logback.classic.LoggerContext",
 				Factory.class.getClassLoader());
 
 		@Override

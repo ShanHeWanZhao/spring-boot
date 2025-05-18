@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.boot.web.embedded.jetty;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -32,12 +33,22 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletResponseWrapper;
+
+import org.eclipse.jetty.http.HttpCookie;
 import org.eclipse.jetty.http.MimeTypes;
+import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
 import org.eclipse.jetty.server.AbstractConnector;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.ErrorHandler;
@@ -60,16 +71,20 @@ import org.eclipse.jetty.webapp.AbstractConfiguration;
 import org.eclipse.jetty.webapp.Configuration;
 import org.eclipse.jetty.webapp.WebAppContext;
 
+import org.springframework.boot.web.server.Cookie.SameSite;
 import org.springframework.boot.web.server.ErrorPage;
 import org.springframework.boot.web.server.MimeMappings;
 import org.springframework.boot.web.server.Shutdown;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.servlet.ServletContextInitializer;
 import org.springframework.boot.web.servlet.server.AbstractServletWebServerFactory;
+import org.springframework.boot.web.servlet.server.CookieSameSiteSupplier;
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.ResourceLoaderAware;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -169,19 +184,22 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 	private Server createServer(InetSocketAddress address) {
 		Server server = new Server(getThreadPool());
 		server.setConnectors(new Connector[] { createConnector(address, server) });
+		server.setStopTimeout(0);
 		return server;
 	}
 
 	private AbstractConnector createConnector(InetSocketAddress address, Server server) {
-		ServerConnector connector = new ServerConnector(server, this.acceptors, this.selectors);
+		HttpConfiguration httpConfiguration = new HttpConfiguration();
+		httpConfiguration.setSendServerVersion(false);
+		List<ConnectionFactory> connectionFactories = new ArrayList<>();
+		connectionFactories.add(new HttpConnectionFactory(httpConfiguration));
+		if (getHttp2() != null && getHttp2().isEnabled()) {
+			connectionFactories.add(new HTTP2CServerConnectionFactory(httpConfiguration));
+		}
+		ServerConnector connector = new ServerConnector(server, this.acceptors, this.selectors,
+				connectionFactories.toArray(new ConnectionFactory[0]));
 		connector.setHost(address.getHostString());
 		connector.setPort(address.getPort());
-		for (ConnectionFactory connectionFactory : connector.getConnectionFactories()) {
-			if (connectionFactory instanceof HttpConfiguration.ConnectionFactory) {
-				((HttpConfiguration.ConnectionFactory) connectionFactory).getHttpConfiguration()
-						.setSendServerVersion(false);
-			}
-		}
 		return connector;
 	}
 
@@ -192,6 +210,9 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 		if (StringUtils.hasText(getServerHeader())) {
 			handler = applyWrapper(handler, JettyHandlerWrappers.createServerHeaderHandlerWrapper(getServerHeader()));
 		}
+		if (!CollectionUtils.isEmpty(getCookieSameSiteSuppliers())) {
+			handler = applyWrapper(handler, new SuppliedSameSiteCookieHandlerWrapper(getCookieSameSiteSuppliers()));
+		}
 		return handler;
 	}
 
@@ -201,7 +222,7 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 	}
 
 	private void customizeSsl(Server server, InetSocketAddress address) {
-		new SslServerCustomizer(address, getSsl(), getSslStoreProvider(), getHttp2()).customize(server);
+		new SslServerCustomizer(address, getSsl(), getOrCreateSslStoreProvider(), getHttp2()).customize(server);
 	}
 
 	/**
@@ -211,7 +232,7 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 	 */
 	protected final void configureWebAppContext(WebAppContext context, ServletContextInitializer... initializers) {
 		Assert.notNull(context, "Context must not be null");
-		context.getAliasChecks().clear();
+		context.clearAliasChecks();
 		context.setTempDirectory(getTempDirectory());
 		if (this.resourceLoader != null) {
 			context.setClassLoader(this.resourceLoader.getClassLoader());
@@ -238,6 +259,10 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 
 	private void configureSession(WebAppContext context) {
 		SessionHandler handler = context.getSessionHandler();
+		SameSite sessionSameSite = getSession().getCookie().getSameSite();
+		if (sessionSameSite != null) {
+			handler.setSameSite(HttpCookie.SameSite.valueOf(sessionSameSite.name()));
+		}
 		Duration sessionTimeout = getSession().getTimeout();
 		handler.setMaxInactiveInterval(isNegative(sessionTimeout) ? -1 : (int) sessionTimeout.getSeconds());
 		if (getSession().isPersistent()) {
@@ -255,7 +280,7 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 
 	private void addLocaleMappings(WebAppContext context) {
 		getLocaleCharsetMappings()
-				.forEach((locale, charset) -> context.addLocaleEncoding(locale.toString(), charset.toString()));
+			.forEach((locale, charset) -> context.addLocaleEncoding(locale.toString(), charset.toString()));
 	}
 
 	private File getTempDirectory() {
@@ -306,7 +331,16 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 		holder.setInitParameter("dirAllowed", "false");
 		holder.setInitOrder(1);
 		context.getServletHandler().addServletWithMapping(holder, "/");
-		context.getServletHandler().getServletMapping("/").setDefault(true);
+		ServletMapping servletMapping = context.getServletHandler().getServletMapping("/");
+		try {
+			servletMapping.setDefault(true);
+		}
+		catch (NoSuchMethodError ex) {
+			// Jetty 10
+			Method setFromDefaultDescriptor = ReflectionUtils.findMethod(servletMapping.getClass(),
+					"setFromDefaultDescriptor", boolean.class);
+			ReflectionUtils.invokeMethod(setFromDefaultDescriptor, servletMapping, true);
+		}
 	}
 
 	/**
@@ -445,7 +479,7 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 
 	/**
 	 * Returns a mutable collection of Jetty {@link JettyServerCustomizer}s that will be
-	 * applied to the {@link Server} before the it is created.
+	 * applied to the {@link Server} before it is created.
 	 * @return the {@link JettyServerCustomizer}s
 	 */
 	public Collection<JettyServerCustomizer> getServerCustomizers() {
@@ -641,6 +675,68 @@ public class JettyServletWebServerFactory extends AbstractServletWebServerFactor
 			ClassLoader classLoader = context.getClassLoader();
 			classLoader = (classLoader != null) ? classLoader : getClass().getClassLoader();
 			return (Class<? extends EventListener>) classLoader.loadClass(className);
+		}
+
+	}
+
+	/**
+	 * {@link HandlerWrapper} to apply {@link CookieSameSiteSupplier supplied}
+	 * {@link SameSite} cookie values.
+	 */
+	private static class SuppliedSameSiteCookieHandlerWrapper extends HandlerWrapper {
+
+		private final List<CookieSameSiteSupplier> suppliers;
+
+		SuppliedSameSiteCookieHandlerWrapper(List<CookieSameSiteSupplier> suppliers) {
+			this.suppliers = suppliers;
+		}
+
+		@Override
+		public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
+				throws IOException, ServletException {
+			HttpServletResponse wrappedResponse = new ResponseWrapper(response);
+			super.handle(target, baseRequest, request, wrappedResponse);
+		}
+
+		class ResponseWrapper extends HttpServletResponseWrapper {
+
+			ResponseWrapper(HttpServletResponse response) {
+				super(response);
+			}
+
+			@Override
+			public void addCookie(Cookie cookie) {
+				SameSite sameSite = getSameSite(cookie);
+				if (sameSite != null) {
+					String comment = HttpCookie.getCommentWithoutAttributes(cookie.getComment());
+					String sameSiteComment = getSameSiteComment(sameSite);
+					cookie.setComment((comment != null) ? comment + sameSiteComment : sameSiteComment);
+				}
+				super.addCookie(cookie);
+			}
+
+			private String getSameSiteComment(SameSite sameSite) {
+				switch (sameSite) {
+					case NONE:
+						return HttpCookie.SAME_SITE_NONE_COMMENT;
+					case LAX:
+						return HttpCookie.SAME_SITE_LAX_COMMENT;
+					case STRICT:
+						return HttpCookie.SAME_SITE_STRICT_COMMENT;
+				}
+				throw new IllegalStateException("Unsupported SameSite value " + sameSite);
+			}
+
+			private SameSite getSameSite(Cookie cookie) {
+				for (CookieSameSiteSupplier supplier : SuppliedSameSiteCookieHandlerWrapper.this.suppliers) {
+					SameSite sameSite = supplier.getSameSite(cookie);
+					if (sameSite != null) {
+						return sameSite;
+					}
+				}
+				return null;
+			}
+
 		}
 
 	}

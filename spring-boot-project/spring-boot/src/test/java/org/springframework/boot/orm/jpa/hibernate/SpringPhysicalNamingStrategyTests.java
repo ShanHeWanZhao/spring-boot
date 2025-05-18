@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Phillip Webb
  * @author Madhura Bhave
  */
+@Deprecated
 class SpringPhysicalNamingStrategyTests {
 
 	private Metadata metadata;
@@ -46,7 +47,8 @@ class SpringPhysicalNamingStrategyTests {
 		this.metadataSources = new MetadataSources(createServiceRegistry());
 		this.metadataSources.addAnnotatedClass(TelephoneNumber.class);
 		this.metadata = this.metadataSources.getMetadataBuilder()
-				.applyPhysicalNamingStrategy(new SpringPhysicalNamingStrategy()).build();
+			.applyPhysicalNamingStrategy(new SpringPhysicalNamingStrategy())
+			.build();
 	}
 
 	private StandardServiceRegistry createServiceRegistry() {
@@ -62,7 +64,8 @@ class SpringPhysicalNamingStrategyTests {
 	@Test
 	void tableNameShouldNotBeLowerCaseIfCaseSensitive() {
 		this.metadata = this.metadataSources.getMetadataBuilder()
-				.applyPhysicalNamingStrategy(new TestSpringPhysicalNamingStrategy()).build();
+			.applyPhysicalNamingStrategy(new TestSpringPhysicalNamingStrategy())
+			.build();
 		PersistentClass binding = this.metadata.getEntityBinding(TelephoneNumber.class.getName());
 		assertThat(binding.getTable().getQuotedName()).isEqualTo("Telephone_Number");
 	}

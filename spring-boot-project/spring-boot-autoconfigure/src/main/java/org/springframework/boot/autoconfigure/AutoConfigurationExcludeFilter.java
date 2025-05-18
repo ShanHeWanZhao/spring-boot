@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@
 package org.springframework.boot.autoconfigure;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.BeanClassLoaderAware;
+import org.springframework.boot.context.annotation.ImportCandidates;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.core.type.classreading.MetadataReader;
@@ -54,13 +56,18 @@ public class AutoConfigurationExcludeFilter implements TypeFilter, BeanClassLoad
 	}
 
 	private boolean isAutoConfiguration(MetadataReader metadataReader) {
-		return getAutoConfigurations().contains(metadataReader.getClassMetadata().getClassName());
+		boolean annotatedWithAutoConfiguration = metadataReader.getAnnotationMetadata()
+			.isAnnotated(AutoConfiguration.class.getName());
+		return annotatedWithAutoConfiguration
+				|| getAutoConfigurations().contains(metadataReader.getClassMetadata().getClassName());
 	}
 
 	protected List<String> getAutoConfigurations() {
 		if (this.autoConfigurations == null) {
-			this.autoConfigurations = SpringFactoriesLoader.loadFactoryNames(EnableAutoConfiguration.class,
-					this.beanClassLoader);
+			List<String> autoConfigurations = new ArrayList<>(
+					SpringFactoriesLoader.loadFactoryNames(EnableAutoConfiguration.class, this.beanClassLoader));
+			ImportCandidates.load(AutoConfiguration.class, this.beanClassLoader).forEach(autoConfigurations::add);
+			this.autoConfigurations = autoConfigurations;
 		}
 		return this.autoConfigurations;
 	}

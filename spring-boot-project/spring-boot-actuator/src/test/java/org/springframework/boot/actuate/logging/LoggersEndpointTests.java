@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,13 +30,14 @@ import org.springframework.boot.actuate.logging.LoggersEndpoint.LoggerLevels;
 import org.springframework.boot.actuate.logging.LoggersEndpoint.SingleLoggerLevels;
 import org.springframework.boot.logging.LogLevel;
 import org.springframework.boot.logging.LoggerConfiguration;
+import org.springframework.boot.logging.LoggerConfiguration.LevelConfiguration;
 import org.springframework.boot.logging.LoggerGroups;
 import org.springframework.boot.logging.LoggingSystem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link LoggersEndpoint}.
@@ -64,7 +65,7 @@ class LoggersEndpointTests {
 	@SuppressWarnings("unchecked")
 	void loggersShouldReturnLoggerConfigurationsWithNoLoggerGroups() {
 		given(this.loggingSystem.getLoggerConfigurations())
-				.willReturn(Collections.singletonList(new LoggerConfiguration("ROOT", null, LogLevel.DEBUG)));
+			.willReturn(Collections.singletonList(new LoggerConfiguration("ROOT", null, LogLevel.DEBUG)));
 		given(this.loggingSystem.getSupportedLogLevels()).willReturn(EnumSet.allOf(LogLevel.class));
 		Map<String, Object> result = new LoggersEndpoint(this.loggingSystem, new LoggerGroups()).loggers();
 		Map<String, LoggerLevels> loggers = (Map<String, LoggerLevels>) result.get("loggers");
@@ -82,7 +83,7 @@ class LoggersEndpointTests {
 	@SuppressWarnings("unchecked")
 	void loggersShouldReturnLoggerConfigurationsWithLoggerGroups() {
 		given(this.loggingSystem.getLoggerConfigurations())
-				.willReturn(Collections.singletonList(new LoggerConfiguration("ROOT", null, LogLevel.DEBUG)));
+			.willReturn(Collections.singletonList(new LoggerConfiguration("ROOT", null, LogLevel.DEBUG)));
 		given(this.loggingSystem.getSupportedLogLevels()).willReturn(EnumSet.allOf(LogLevel.class));
 		Map<String, Object> result = new LoggersEndpoint(this.loggingSystem, this.loggerGroups).loggers();
 		Map<String, GroupLoggerLevels> loggerGroups = (Map<String, GroupLoggerLevels>) result.get("groups");
@@ -102,17 +103,27 @@ class LoggersEndpointTests {
 	@Test
 	void loggerLevelsWhenNameSpecifiedShouldReturnLevels() {
 		given(this.loggingSystem.getLoggerConfiguration("ROOT"))
-				.willReturn(new LoggerConfiguration("ROOT", null, LogLevel.DEBUG));
+			.willReturn(new LoggerConfiguration("ROOT", null, LogLevel.DEBUG));
 		SingleLoggerLevels levels = (SingleLoggerLevels) new LoggersEndpoint(this.loggingSystem, this.loggerGroups)
-				.loggerLevels("ROOT");
+			.loggerLevels("ROOT");
 		assertThat(levels.getConfiguredLevel()).isNull();
 		assertThat(levels.getEffectiveLevel()).isEqualTo("DEBUG");
+	}
+
+	@Test // gh-35227
+	void loggerLevelsWhenCustomLevelShouldReturnLevels() {
+		given(this.loggingSystem.getLoggerConfiguration("ROOT"))
+			.willReturn(new LoggerConfiguration("ROOT", null, LevelConfiguration.ofCustom("FINEST")));
+		SingleLoggerLevels levels = (SingleLoggerLevels) new LoggersEndpoint(this.loggingSystem, this.loggerGroups)
+			.loggerLevels("ROOT");
+		assertThat(levels.getConfiguredLevel()).isNull();
+		assertThat(levels.getEffectiveLevel()).isEqualTo("FINEST");
 	}
 
 	@Test
 	void groupNameSpecifiedShouldReturnConfiguredLevelAndMembers() {
 		GroupLoggerLevels levels = (GroupLoggerLevels) new LoggersEndpoint(this.loggingSystem, this.loggerGroups)
-				.loggerLevels("test");
+			.loggerLevels("test");
 		assertThat(levels.getConfiguredLevel()).isEqualTo("DEBUG");
 		assertThat(levels.getMembers()).isEqualTo(Collections.singletonList("test.member"));
 	}
@@ -120,25 +131,25 @@ class LoggersEndpointTests {
 	@Test
 	void configureLogLevelShouldSetLevelOnLoggingSystem() {
 		new LoggersEndpoint(this.loggingSystem, this.loggerGroups).configureLogLevel("ROOT", LogLevel.DEBUG);
-		verify(this.loggingSystem).setLogLevel("ROOT", LogLevel.DEBUG);
+		then(this.loggingSystem).should().setLogLevel("ROOT", LogLevel.DEBUG);
 	}
 
 	@Test
 	void configureLogLevelWithNullSetsLevelOnLoggingSystemToNull() {
 		new LoggersEndpoint(this.loggingSystem, this.loggerGroups).configureLogLevel("ROOT", null);
-		verify(this.loggingSystem).setLogLevel("ROOT", null);
+		then(this.loggingSystem).should().setLogLevel("ROOT", null);
 	}
 
 	@Test
 	void configureLogLevelInLoggerGroupShouldSetLevelOnLoggingSystem() {
 		new LoggersEndpoint(this.loggingSystem, this.loggerGroups).configureLogLevel("test", LogLevel.DEBUG);
-		verify(this.loggingSystem).setLogLevel("test.member", LogLevel.DEBUG);
+		then(this.loggingSystem).should().setLogLevel("test.member", LogLevel.DEBUG);
 	}
 
 	@Test
 	void configureLogLevelWithNullInLoggerGroupShouldSetLevelOnLoggingSystem() {
 		new LoggersEndpoint(this.loggingSystem, this.loggerGroups).configureLogLevel("test", null);
-		verify(this.loggingSystem).setLogLevel("test.member", null);
+		then(this.loggingSystem).should().setLogLevel("test.member", null);
 	}
 
 }

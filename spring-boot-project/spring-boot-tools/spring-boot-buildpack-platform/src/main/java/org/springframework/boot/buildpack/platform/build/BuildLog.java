@@ -31,6 +31,7 @@ import org.springframework.boot.buildpack.platform.docker.type.VolumeName;
  * @author Phillip Webb
  * @author Scott Frederick
  * @author Andrey Shlykov
+ * @author Rafael Ceccone
  * @since 2.3.0
  * @see #toSystemOut()
  */
@@ -41,48 +42,6 @@ public interface BuildLog {
 	 * @param request the build request
 	 */
 	void start(BuildRequest request);
-
-	/**
-	 * Log that the builder image is being pulled.
-	 * @param request the build request
-	 * @param imageReference the builder image reference
-	 * @return a consumer for progress update events
-	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
-	 * {@link #pullingImage(ImageReference, ImageType)}
-	 */
-	@Deprecated
-	Consumer<TotalProgressEvent> pullingBuilder(BuildRequest request, ImageReference imageReference);
-
-	/**
-	 * Log that the builder image has been pulled.
-	 * @param request the build request
-	 * @param image the builder image that was pulled
-	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
-	 * {@link #pulledImage(Image, ImageType)}
-	 */
-	@Deprecated
-	void pulledBuilder(BuildRequest request, Image image);
-
-	/**
-	 * Log that a run image is being pulled.
-	 * @param request the build request
-	 * @param imageReference the run image reference
-	 * @return a consumer for progress update events
-	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
-	 * {@link #pullingImage(ImageReference, ImageType)}
-	 */
-	@Deprecated
-	Consumer<TotalProgressEvent> pullingRunImage(BuildRequest request, ImageReference imageReference);
-
-	/**
-	 * Log that a run image has been pulled.
-	 * @param request the build request
-	 * @param image the run image that was pulled
-	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
-	 * {@link #pulledImage(Image, ImageType)}
-	 */
-	@Deprecated
-	void pulledRunImage(BuildRequest request, Image image);
 
 	/**
 	 * Log that an image is being pulled.
@@ -140,6 +99,12 @@ public interface BuildLog {
 	 * @param request the build request
 	 */
 	void executedLifecycle(BuildRequest request);
+
+	/**
+	 * Log that a tag has been created.
+	 * @param tag the tag reference
+	 */
+	void taggedImage(ImageReference tag);
 
 	/**
 	 * Factory method that returns a {@link BuildLog} the outputs to {@link System#out}.

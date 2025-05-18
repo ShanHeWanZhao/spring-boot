@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisClusterConfiguration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisSentinelConfiguration;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisClientConfiguration;
 import org.springframework.data.redis.connection.jedis.JedisClientConfiguration.JedisClientConfigurationBuilder;
 import org.springframework.data.redis.connection.jedis.JedisConnection;
@@ -49,9 +50,10 @@ import org.springframework.util.StringUtils;
 class JedisConnectionConfiguration extends RedisConnectionConfiguration {
 
 	JedisConnectionConfiguration(RedisProperties properties,
+			ObjectProvider<RedisStandaloneConfiguration> standaloneConfigurationProvider,
 			ObjectProvider<RedisSentinelConfiguration> sentinelConfiguration,
 			ObjectProvider<RedisClusterConfiguration> clusterConfiguration) {
-		super(properties, sentinelConfiguration, clusterConfiguration);
+		super(properties, standaloneConfigurationProvider, sentinelConfiguration, clusterConfiguration);
 	}
 
 	@Bean
@@ -76,7 +78,7 @@ class JedisConnectionConfiguration extends RedisConnectionConfiguration {
 			ObjectProvider<JedisClientConfigurationBuilderCustomizer> builderCustomizers) {
 		JedisClientConfigurationBuilder builder = applyProperties(JedisClientConfiguration.builder());
 		RedisProperties.Pool pool = getProperties().getJedis().getPool();
-		if (pool != null) {
+		if (isPoolEnabled(pool)) {
 			applyPooling(pool, builder);
 		}
 		if (StringUtils.hasText(getProperties().getUrl())) {
@@ -106,10 +108,10 @@ class JedisConnectionConfiguration extends RedisConnectionConfiguration {
 		config.setMaxIdle(pool.getMaxIdle());
 		config.setMinIdle(pool.getMinIdle());
 		if (pool.getTimeBetweenEvictionRuns() != null) {
-			config.setTimeBetweenEvictionRunsMillis(pool.getTimeBetweenEvictionRuns().toMillis());
+			config.setTimeBetweenEvictionRuns(pool.getTimeBetweenEvictionRuns());
 		}
 		if (pool.getMaxWait() != null) {
-			config.setMaxWaitMillis(pool.getMaxWait().toMillis());
+			config.setMaxWait(pool.getMaxWait());
 		}
 		return config;
 	}

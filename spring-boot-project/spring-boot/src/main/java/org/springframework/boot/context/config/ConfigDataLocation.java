@@ -53,7 +53,7 @@ public final class ConfigDataLocation implements OriginProvider {
 	}
 
 	/**
-	 * Return the the location is optional and should ignore
+	 * Return if the location is optional and should ignore
 	 * {@link ConfigDataNotFoundException}.
 	 * @return if the location is optional
 	 */
@@ -63,7 +63,7 @@ public final class ConfigDataLocation implements OriginProvider {
 
 	/**
 	 * Return the value of the location (always excluding any user specified
-	 * {@code optional:} prefix.
+	 * {@code optional:} prefix).
 	 * @return the location value
 	 */
 	public String getValue() {
@@ -95,6 +95,32 @@ public final class ConfigDataLocation implements OriginProvider {
 	@Override
 	public Origin getOrigin() {
 		return this.origin;
+	}
+
+	/**
+	 * Return an array of {@link ConfigDataLocation} elements built by splitting this
+	 * {@link ConfigDataLocation} around a delimiter of {@code ";"}.
+	 * @return the split locations
+	 * @since 2.4.7
+	 */
+	public ConfigDataLocation[] split() {
+		return split(";");
+	}
+
+	/**
+	 * Return an array of {@link ConfigDataLocation} elements built by splitting this
+	 * {@link ConfigDataLocation} around the specified delimiter.
+	 * @param delimiter the delimiter to split on
+	 * @return the split locations
+	 * @since 2.4.7
+	 */
+	public ConfigDataLocation[] split(String delimiter) {
+		String[] values = StringUtils.delimitedListToStringArray(toString(), delimiter);
+		ConfigDataLocation[] result = new ConfigDataLocation[values.length];
+		for (int i = 0; i < values.length; i++) {
+			result[i] = of(values[i]).withOrigin(getOrigin());
+		}
+		return result;
 	}
 
 	@Override

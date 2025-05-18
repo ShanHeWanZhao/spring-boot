@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ConfigurationClassPostProcessor;
 import org.springframework.context.event.SmartApplicationListener;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.AbstractEnvironment;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.MutablePropertySources;
@@ -112,7 +113,7 @@ import org.springframework.util.StringUtils;
  * @author Madhura Bhave
  * @author Scott Frederick
  * @since 1.0.0
- * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
+ * @deprecated since 2.4.0 for removal in 3.0.0 in favor of
  * {@link ConfigDataEnvironmentPostProcessor}
  */
 @Deprecated
@@ -315,7 +316,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			this.placeholdersResolver = new PropertySourcesPlaceholdersResolver(this.environment);
 			this.resourceLoader = (resourceLoader != null) ? resourceLoader : new DefaultResourceLoader(null);
 			this.propertySourceLoaders = SpringFactoriesLoader.loadFactories(PropertySourceLoader.class,
-					getClass().getClassLoader());
+					this.resourceLoader.getClassLoader());
 		}
 
 		void load() {
@@ -356,23 +357,29 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			Set<Profile> includedViaProperty = getProfiles(binder, INCLUDE_PROFILES_PROPERTY);
 			List<Profile> otherActiveProfiles = getOtherActiveProfiles(activatedViaProperty, includedViaProperty);
 			this.profiles.addAll(otherActiveProfiles);
-			// Any pre-existing active profiles set via property sources (e.g.
+			// Any pre-existing active profiles set through property sources (e.g.
 			// System properties) take precedence over those added in config files.
 			this.profiles.addAll(includedViaProperty);
 			addActiveProfiles(activatedViaProperty);
 			if (this.profiles.size() == 1) { // only has null profile
-				for (String defaultProfileName : this.environment.getDefaultProfiles()) {
+				for (String defaultProfileName : getDefaultProfiles(binder)) {
 					Profile defaultProfile = new Profile(defaultProfileName, true);
 					this.profiles.add(defaultProfile);
 				}
 			}
 		}
 
+		private String[] getDefaultProfiles(Binder binder) {
+			return binder.bind(AbstractEnvironment.DEFAULT_PROFILES_PROPERTY_NAME, STRING_ARRAY)
+				.orElseGet(this.environment::getDefaultProfiles);
+		}
+
 		private List<Profile> getOtherActiveProfiles(Set<Profile> activatedViaProperty,
 				Set<Profile> includedViaProperty) {
-			return Arrays.stream(this.environment.getActiveProfiles()).map(Profile::new).filter(
-					(profile) -> !activatedViaProperty.contains(profile) && !includedViaProperty.contains(profile))
-					.collect(Collectors.toList());
+			return Arrays.stream(this.environment.getActiveProfiles())
+				.map(Profile::new)
+				.filter((profile) -> !activatedViaProperty.contains(profile) && !includedViaProperty.contains(profile))
+				.collect(Collectors.toList());
 		}
 
 		void addActiveProfiles(Set<Profile> profiles) {
@@ -463,7 +470,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 
 		private boolean canLoadFileExtension(PropertySourceLoader loader, String name) {
 			return Arrays.stream(loader.getFileExtensions())
-					.anyMatch((fileExtension) -> StringUtils.endsWithIgnoreCase(name, fileExtension));
+				.anyMatch((fileExtension) -> StringUtils.endsWithIgnoreCase(name, fileExtension));
 		}
 
 		private void loadForFileExtension(PropertySourceLoader loader, String prefix, String fileExtension,
@@ -595,9 +602,12 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			if (files != null) {
 				String fileName = locationReference.substring(locationReference.lastIndexOf("/") + 1);
 				Arrays.sort(files, FILE_COMPARATOR);
-				return Arrays.stream(files).map((file) -> file.listFiles((dir, name) -> name.equals(fileName)))
-						.filter(Objects::nonNull).flatMap((Function<File[], Stream<File>>) Arrays::stream)
-						.map(FileSystemResource::new).toArray(Resource[]::new);
+				return Arrays.stream(files)
+					.map((file) -> file.listFiles((dir, name) -> name.equals(fileName)))
+					.filter(Objects::nonNull)
+					.flatMap((Function<File[], Stream<File>>) Arrays::stream)
+					.map(FileSystemResource::new)
+					.toArray(Resource[]::new);
 			}
 			return EMPTY_RESOURCES;
 		}
@@ -777,13 +787,15 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			if (defaultProperties != null) {
 				Binder binder = new Binder(ConfigurationPropertySources.from(defaultProperties),
 						new PropertySourcesPlaceholdersResolver(this.environment));
-				activeProfiles.addAll(getDefaultProfiles(binder, "spring.profiles.include"));
+				activeProfiles.addAll(bindStringList(binder, "spring.profiles.include"));
 				if (!this.activatedProfiles) {
-					activeProfiles.addAll(getDefaultProfiles(binder, "spring.profiles.active"));
+					activeProfiles.addAll(bindStringList(binder, "spring.profiles.active"));
 				}
 			}
-			this.processedProfiles.stream().filter(this::isDefaultProfile).map(Profile::getName)
-					.forEach(activeProfiles::add);
+			this.processedProfiles.stream()
+				.filter(this::isDefaultProfile)
+				.map(Profile::getName)
+				.forEach(activeProfiles::add);
 			this.environment.setActiveProfiles(activeProfiles.toArray(new String[0]));
 		}
 
@@ -791,7 +803,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor, 
 			return profile != null && !profile.isDefaultProfile();
 		}
 
-		private List<String> getDefaultProfiles(Binder binder, String property) {
+		private List<String> bindStringList(Binder binder, String property) {
 			return binder.bind(property, STRING_LIST).orElse(Collections.emptyList());
 		}
 

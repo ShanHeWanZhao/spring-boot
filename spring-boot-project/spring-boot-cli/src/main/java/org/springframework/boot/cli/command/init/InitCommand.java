@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
@@ -38,6 +41,7 @@ import org.springframework.util.Assert;
  *
  * @author Stephane Nicoll
  * @author Eddú Meléndez
+ * @author Vignesh Thangavel Ilangovan
  * @since 1.2.0
  */
 public class InitCommand extends OptionParsingCommand {
@@ -70,6 +74,21 @@ public class InitCommand extends OptionParsingCommand {
 	 * {@link OptionHandler} for {@link InitCommand}.
 	 */
 	static class InitOptionHandler extends OptionHandler {
+
+		/**
+		 * Mapping from camelCase options advertised by the service to our kebab-case
+		 * options.
+		 */
+		private static final Map<String, String> CAMEL_CASE_OPTIONS;
+		static {
+			Map<String, String> options = new HashMap<>();
+			options.put("--groupId", "--group-id");
+			options.put("--artifactId", "--artifact-id");
+			options.put("--packageName", "--package-name");
+			options.put("--javaVersion", "--java-version");
+			options.put("--bootVersion", "--boot-version");
+			CAMEL_CASE_OPTIONS = Collections.unmodifiableMap(options);
+		}
 
 		private final ServiceCapabilitiesReportGenerator serviceCapabilitiesReport;
 
@@ -112,15 +131,15 @@ public class InitCommand extends OptionParsingCommand {
 		private OptionSpec<Void> force;
 
 		InitOptionHandler(InitializrService initializrService) {
+			super(InitOptionHandler::processArgument);
 			this.serviceCapabilitiesReport = new ServiceCapabilitiesReportGenerator(initializrService);
 			this.projectGenerator = new ProjectGenerator(initializrService);
-
 		}
 
 		@Override
 		protected void options() {
 			this.target = option(Arrays.asList("target"), "URL of the service to use").withRequiredArg()
-					.defaultsTo(ProjectGenerationRequest.DEFAULT_SERVICE_URL);
+				.defaultsTo(ProjectGenerationRequest.DEFAULT_SERVICE_URL);
 			this.listCapabilities = option(Arrays.asList("list"),
 					"List the capabilities of the service. Use it to discover the "
 							+ "dependencies and the types that are available");
@@ -129,34 +148,38 @@ public class InitCommand extends OptionParsingCommand {
 		}
 
 		private void projectGenerationOptions() {
-			this.groupId = option(Arrays.asList("groupId", "g"), "Project coordinates (for example 'org.test')")
-					.withRequiredArg();
-			this.artifactId = option(Arrays.asList("artifactId", "a"),
-					"Project coordinates; infer archive name (for example 'test')").withRequiredArg();
+			this.groupId = option(Arrays.asList("group-id", "g"), "Project coordinates (for example 'org.test')")
+				.withRequiredArg();
+			this.artifactId = option(Arrays.asList("artifact-id", "a"),
+					"Project coordinates; infer archive name (for example 'test')")
+				.withRequiredArg();
 			this.version = option(Arrays.asList("version", "v"), "Project version (for example '0.0.1-SNAPSHOT')")
-					.withRequiredArg();
+				.withRequiredArg();
 			this.name = option(Arrays.asList("name", "n"), "Project name; infer application name").withRequiredArg();
 			this.description = option("description", "Project description").withRequiredArg();
-			this.packageName = option("package-name", "Package name").withRequiredArg();
+			this.packageName = option(Arrays.asList("package-name"), "Package name").withRequiredArg();
 			this.type = option(Arrays.asList("type", "t"),
 					"Project type. Not normally needed if you use --build "
 							+ "and/or --format. Check the capabilities of the service (--list) for more details")
-									.withRequiredArg();
+				.withRequiredArg();
 			this.packaging = option(Arrays.asList("packaging", "p"), "Project packaging (for example 'jar')")
-					.withRequiredArg();
+				.withRequiredArg();
 			this.build = option("build", "Build system to use (for example 'maven' or 'gradle')").withRequiredArg()
-					.defaultsTo("maven");
+				.defaultsTo("maven");
 			this.format = option("format", "Format of the generated content (for example 'build' for a build file, "
-					+ "'project' for a project archive)").withRequiredArg().defaultsTo("project");
+					+ "'project' for a project archive)")
+				.withRequiredArg()
+				.defaultsTo("project");
 			this.javaVersion = option(Arrays.asList("java-version", "j"), "Language level (for example '1.8')")
-					.withRequiredArg();
+				.withRequiredArg();
 			this.language = option(Arrays.asList("language", "l"), "Programming language  (for example 'java')")
-					.withRequiredArg();
+				.withRequiredArg();
 			this.bootVersion = option(Arrays.asList("boot-version", "b"),
-					"Spring Boot version (for example '1.2.0.RELEASE')").withRequiredArg();
+					"Spring Boot version (for example '1.2.0.RELEASE')")
+				.withRequiredArg();
 			this.dependencies = option(Arrays.asList("dependencies", "d"),
 					"Comma-separated list of dependency identifiers to include in the generated project")
-							.withRequiredArg();
+				.withRequiredArg();
 		}
 
 		private void otherOptions() {
@@ -247,6 +270,16 @@ public class InitCommand extends OptionParsingCommand {
 				request.setOutput(output);
 			}
 			return request;
+		}
+
+		private static String processArgument(String argument) {
+			for (Map.Entry<String, String> entry : CAMEL_CASE_OPTIONS.entrySet()) {
+				String name = entry.getKey();
+				if (argument.startsWith(name + " ") || argument.startsWith(name + "=")) {
+					return entry.getValue() + argument.substring(name.length());
+				}
+			}
+			return argument;
 		}
 
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,8 @@ import org.springframework.boot.configurationprocessor.metadata.ItemMetadata;
  * @author Jonas Keßler
  * @since 1.2.0
  */
-@SupportedAnnotationTypes({ ConfigurationMetadataAnnotationProcessor.CONFIGURATION_PROPERTIES_ANNOTATION,
+@SupportedAnnotationTypes({ ConfigurationMetadataAnnotationProcessor.AUTO_CONFIGURATION_ANNOTATION,
+		ConfigurationMetadataAnnotationProcessor.CONFIGURATION_PROPERTIES_ANNOTATION,
 		ConfigurationMetadataAnnotationProcessor.CONTROLLER_ENDPOINT_ANNOTATION,
 		ConfigurationMetadataAnnotationProcessor.ENDPOINT_ANNOTATION,
 		ConfigurationMetadataAnnotationProcessor.JMX_ENDPOINT_ANNOTATION,
@@ -97,8 +98,10 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 
 	static final String NAME_ANNOTATION = "org.springframework.boot.context.properties.bind.Name";
 
+	static final String AUTO_CONFIGURATION_ANNOTATION = "org.springframework.boot.autoconfigure.AutoConfiguration";
+
 	private static final Set<String> SUPPORTED_OPTIONS = Collections
-			.unmodifiableSet(Collections.singleton(ADDITIONAL_METADATA_LOCATIONS_OPTION));
+		.unmodifiableSet(Collections.singleton(ADDITIONAL_METADATA_LOCATIONS_OPTION));
 
 	private MetadataStore metadataStore;
 
@@ -177,7 +180,7 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 		}
 		if (roundEnv.processingOver()) {
 			try {
-				writeMetaData();
+				writeMetadata();
 			}
 			catch (Exception ex) {
 				throw new IllegalStateException("Failed to write metadata", ex);
@@ -232,8 +235,9 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 						this.metadataEnv.getTypeUtils().getQualifiedName(element.getEnclosingElement()),
 						element.toString());
 				if (this.metadataCollector.hasSimilarGroup(group)) {
-					this.processingEnv.getMessager().printMessage(Kind.ERROR,
-							"Duplicate `@ConfigurationProperties` definition for prefix '" + prefix + "'", element);
+					this.processingEnv.getMessager()
+						.printMessage(Kind.ERROR,
+								"Duplicate @ConfigurationProperties definition for prefix '" + prefix + "'", element);
 				}
 				else {
 					this.metadataCollector.add(group);
@@ -251,7 +255,7 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 				this.metadataCollector.add(descriptor.resolveItemMetadata(prefix, this.metadataEnv));
 				if (descriptor.isNested(this.metadataEnv)) {
 					TypeElement nestedTypeElement = (TypeElement) this.metadataEnv.getTypeUtils()
-							.asElement(descriptor.getType());
+						.asElement(descriptor.getType());
 					String nestedPrefix = ConfigurationMetadata.nestedPrefix(prefix, descriptor.getName());
 					processTypeElement(nestedPrefix, nestedTypeElement, source, seen);
 				}
@@ -324,7 +328,7 @@ public class ConfigurationMetadataAnnotationProcessor extends AbstractProcessor 
 		return null;
 	}
 
-	protected ConfigurationMetadata writeMetaData() throws Exception {
+	protected ConfigurationMetadata writeMetadata() throws Exception {
 		ConfigurationMetadata metadata = this.metadataCollector.getMetadata();
 		metadata = mergeAdditionalMetadata(metadata);
 		if (!metadata.getItems().isEmpty()) {

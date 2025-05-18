@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,11 @@
 
 package org.springframework.boot.context.config;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.boot.context.properties.bind.AbstractBindHandler;
 import org.springframework.boot.context.properties.bind.BindContext;
@@ -30,6 +34,7 @@ import org.springframework.boot.origin.Origin;
  * objects.
  *
  * @author Phillip Webb
+ * @author Scott Frederick
  */
 class ConfigDataLocationBindHandler extends AbstractBindHandler {
 
@@ -40,19 +45,17 @@ class ConfigDataLocationBindHandler extends AbstractBindHandler {
 			return withOrigin(context, (ConfigDataLocation) result);
 		}
 		if (result instanceof List) {
-			List<Object> list = (List<Object>) result;
-			for (int i = 0; i < list.size(); i++) {
-				Object element = list.get(i);
-				if (element instanceof ConfigDataLocation) {
-					list.set(i, withOrigin(context, (ConfigDataLocation) element));
-				}
-			}
+			return ((List<Object>) result).stream()
+				.filter(Objects::nonNull)
+				.map((element) -> (element instanceof ConfigDataLocation)
+						? withOrigin(context, (ConfigDataLocation) element) : element)
+				.collect(Collectors.toCollection(ArrayList::new));
 		}
 		if (result instanceof ConfigDataLocation[]) {
-			ConfigDataLocation[] locations = (ConfigDataLocation[]) result;
-			for (int i = 0; i < locations.length; i++) {
-				locations[i] = withOrigin(context, locations[i]);
-			}
+			return Arrays.stream((ConfigDataLocation[]) result)
+				.filter(Objects::nonNull)
+				.map((element) -> withOrigin(context, element))
+				.toArray(ConfigDataLocation[]::new);
 		}
 		return result;
 	}

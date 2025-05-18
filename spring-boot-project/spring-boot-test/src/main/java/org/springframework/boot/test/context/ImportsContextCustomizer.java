@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
@@ -36,6 +37,7 @@ import org.springframework.boot.context.annotation.DeterminableImports;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotatedBeanDefinitionReader;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
@@ -43,6 +45,9 @@ import org.springframework.context.annotation.ImportSelector;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.annotation.MergedAnnotation;
+import org.springframework.core.annotation.MergedAnnotations;
+import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.style.ToStringCreator;
 import org.springframework.core.type.AnnotationMetadata;
@@ -83,6 +88,7 @@ class ImportsContextCustomizer implements ContextCustomizer {
 	private void registerCleanupPostProcessor(BeanDefinitionRegistry registry, AnnotatedBeanDefinitionReader reader) {
 		BeanDefinition definition = registerBean(registry, reader, ImportsCleanupPostProcessor.BEAN_NAME,
 				ImportsCleanupPostProcessor.class);
+		definition.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
 		definition.getConstructorArgumentValues().addIndexedArgumentValue(0, this.testClass);
 	}
 
@@ -222,6 +228,7 @@ class ImportsContextCustomizer implements ContextCustomizer {
 			filters.add(new JavaLangAnnotationFilter());
 			filters.add(new KotlinAnnotationFilter());
 			filters.add(new SpockAnnotationFilter());
+			filters.add(new JUnitAnnotationFilter());
 			ANNOTATION_FILTERS = Collections.unmodifiableSet(filters);
 		}
 
@@ -232,7 +239,18 @@ class ImportsContextCustomizer implements ContextCustomizer {
 			Set<Class<?>> seen = new HashSet<>();
 			collectClassAnnotations(testClass, annotations, seen);
 			Set<Object> determinedImports = determineImports(annotations, testClass);
-			this.key = Collections.unmodifiableSet((determinedImports != null) ? determinedImports : annotations);
+			if (determinedImports == null) {
+				this.key = Collections.unmodifiableSet(annotations);
+			}
+			else {
+				Set<Object> key = new HashSet<>();
+				key.addAll(determinedImports);
+				Set<Annotation> componentScanning = annotations.stream()
+					.filter(ComponentScan.class::isInstance)
+					.collect(Collectors.toSet());
+				key.addAll(componentScanning);
+				this.key = Collections.unmodifiableSet(key);
+			}
 		}
 
 		private void collectClassAnnotations(Class<?> classType, Set<Annotation> annotations, Set<Class<?>> seen) {
@@ -249,7 +267,9 @@ class ImportsContextCustomizer implements ContextCustomizer {
 
 		private void collectElementAnnotations(AnnotatedElement element, Set<Annotation> annotations,
 				Set<Class<?>> seen) {
-			for (Annotation annotation : element.getDeclaredAnnotations()) {
+			for (MergedAnnotation<Annotation> mergedAnnotation : MergedAnnotations.from(element,
+					SearchStrategy.DIRECT)) {
+				Annotation annotation = mergedAnnotation.synthesize();
 				if (!isIgnoredAnnotation(annotation)) {
 					annotations.add(annotation);
 					collectClassAnnotations(annotation.annotationType(), annotations, seen);
@@ -380,6 +400,18 @@ class ImportsContextCustomizer implements ContextCustomizer {
 		public boolean isIgnored(Annotation annotation) {
 			return annotation.annotationType().getName().startsWith("org.spockframework.")
 					|| annotation.annotationType().getName().startsWith("spock.");
+		}
+
+	}
+
+	/**
+	 * {@link AnnotationFilter} for JUnit annotations.
+	 */
+	private static final class JUnitAnnotationFilter implements AnnotationFilter {
+
+		@Override
+		public boolean isIgnored(Annotation annotation) {
+			return annotation.annotationType().getName().startsWith("org.junit.");
 		}
 
 	}

@@ -26,17 +26,6 @@ import org.springframework.stereotype.Controller;
  * @author Scott Frederick
  * @since 2.0.0
  */
-@FunctionalInterface
 public interface ErrorController {
-
-	/**
-	 * The return value from this method is not used; the property `server.error.path`
-	 * must be set to override the default error page path.
-	 * @return the error path
-	 * @deprecated since 2.3.0 for removal in 2.5.0 in favor of setting the property
-	 * `server.error.path`
-	 */
-	@Deprecated
-	String getErrorPath();
 
 }

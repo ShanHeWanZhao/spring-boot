@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,9 @@ import org.springframework.test.context.support.DependencyInjectionTestExecution
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 
 /**
  * Tests for {@link SpringBootDependencyInjectionTestExecutionListener}.
@@ -59,6 +61,7 @@ class SpringBootDependencyInjectionTestExecutionListenerTests {
 		SpringApplication application = new SpringApplication(Config.class);
 		application.setWebApplicationType(WebApplicationType.NONE);
 		ConfigurableApplicationContext applicationContext = application.run();
+		given(testContext.hasApplicationContext()).willReturn(true);
 		given(testContext.getApplicationContext()).willReturn(applicationContext);
 		try {
 			this.reportListener.prepareTestInstance(testContext);
@@ -66,12 +69,13 @@ class SpringBootDependencyInjectionTestExecutionListenerTests {
 		catch (IllegalStateException ex) {
 			// Expected
 		}
-		assertThat(output).contains("CONDITIONS EVALUATION REPORT").contains("Positive matches")
-				.contains("Negative matches");
+		assertThat(output).contains("CONDITIONS EVALUATION REPORT")
+			.contains("Positive matches")
+			.contains("Negative matches");
 	}
 
 	@Test
-	void originalFailureIsThrownWhenReportGenerationFails() throws Exception {
+	void originalFailureIsThrownWhenReportGenerationFails() {
 		TestContext testContext = mock(TestContext.class);
 		IllegalStateException originalFailure = new IllegalStateException();
 		given(testContext.getTestInstance()).willThrow(originalFailure);
@@ -79,7 +83,18 @@ class SpringBootDependencyInjectionTestExecutionListenerTests {
 		application.setWebApplicationType(WebApplicationType.NONE);
 		given(testContext.getApplicationContext()).willThrow(new RuntimeException());
 		assertThatIllegalStateException().isThrownBy(() -> this.reportListener.prepareTestInstance(testContext))
-				.isEqualTo(originalFailure);
+			.isEqualTo(originalFailure);
+	}
+
+	@Test
+	void whenTestContextDoesNotHaveApplicationContextOnlyOneAttemptIsMadeToRetrieveIt() {
+		TestContext testContext = mock(TestContext.class);
+		given(testContext.getTestInstance()).willThrow(new IllegalStateException());
+		SpringApplication application = new SpringApplication(Config.class);
+		application.setWebApplicationType(WebApplicationType.NONE);
+		given(testContext.hasApplicationContext()).willReturn(false);
+		assertThatIllegalStateException().isThrownBy(() -> this.reportListener.prepareTestInstance(testContext));
+		then(testContext).should(times(1)).getTestInstance();
 	}
 
 	@Configuration(proxyBeanMethods = false)

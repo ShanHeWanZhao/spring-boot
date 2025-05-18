@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,10 +42,10 @@ class ClassPathIndexFileTests {
 	File temp;
 
 	@Test
-	void loadIfPossibleWhenRootIsNotFileReturnsNull() throws IOException {
+	void loadIfPossibleWhenRootIsNotFileReturnsNull() {
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> ClassPathIndexFile.loadIfPossible(new URL("https://example.com/file"), "test.idx"))
-				.withMessage("URL does not reference a file");
+			.isThrownBy(() -> ClassPathIndexFile.loadIfPossible(new URL("https://example.com/file"), "test.idx"))
+			.withMessage("URL does not reference a file");
 	}
 
 	@Test
@@ -95,7 +95,7 @@ class ClassPathIndexFileTests {
 		}
 	}
 
-	private ClassPathIndexFile copyAndLoadTestIndexFile() throws IOException, MalformedURLException {
+	private ClassPathIndexFile copyAndLoadTestIndexFile() throws IOException {
 		copyTestIndexFile();
 		ClassPathIndexFile indexFile = ClassPathIndexFile.loadIfPossible(this.temp.toURI().toURL(), "test.idx");
 		return indexFile;

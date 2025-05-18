@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,13 +25,11 @@ import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
-import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.internal.impl.DefaultRepositorySystem;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RepositoryPolicy;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
-import org.eclipse.aether.spi.locator.ServiceLocator;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
 
@@ -40,7 +38,10 @@ import org.eclipse.aether.transport.http.HttpTransporterFactory;
  *
  * @author Andy Wilkinson
  * @since 1.0.0
+ * @deprecated since 2.5.9 for removal in 3.0.0 in favor of
+ * {@link MavenResolverGrapeEngineFactory}
  */
+@Deprecated
 public abstract class AetherGrapeEngineFactory {
 
 	public static AetherGrapeEngine create(GroovyClassLoader classLoader,
@@ -48,8 +49,9 @@ public abstract class AetherGrapeEngineFactory {
 			DependencyResolutionContext dependencyResolutionContext, boolean quiet) {
 		RepositorySystem repositorySystem = createServiceLocator().getService(RepositorySystem.class);
 		DefaultRepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils.newSession();
+		repositorySystemSession.setSystemProperties(System.getProperties());
 		ServiceLoader<RepositorySystemSessionAutoConfiguration> autoConfigurations = ServiceLoader
-				.load(RepositorySystemSessionAutoConfiguration.class);
+			.load(RepositorySystemSessionAutoConfiguration.class);
 		for (RepositorySystemSessionAutoConfiguration autoConfiguration : autoConfigurations) {
 			autoConfiguration.apply(repositorySystemSession, repositorySystem);
 		}
@@ -58,8 +60,8 @@ public abstract class AetherGrapeEngineFactory {
 				createRepositories(repositoryConfigurations), dependencyResolutionContext, quiet);
 	}
 
-	private static ServiceLocator createServiceLocator() {
-		DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
+	private static org.eclipse.aether.impl.DefaultServiceLocator createServiceLocator() {
+		org.eclipse.aether.impl.DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
 		locator.addService(RepositorySystem.class, DefaultRepositorySystem.class);
 		locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
 		locator.addService(TransporterFactory.class, HttpTransporterFactory.class);

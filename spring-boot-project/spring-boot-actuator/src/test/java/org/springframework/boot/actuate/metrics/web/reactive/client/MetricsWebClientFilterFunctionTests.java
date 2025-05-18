@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.MockClock;
+import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.search.MeterNotFoundException;
 import io.micrometer.core.instrument.simple.SimpleConfig;
@@ -41,7 +43,7 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -49,6 +51,7 @@ import static org.mockito.Mockito.mock;
  * Tests for {@link MetricsWebClientFilterFunction}
  *
  * @author Brian Clozel
+ * @author Scott Frederick
  */
 class MetricsWebClientFilterFunctionTests {
 
@@ -58,6 +61,8 @@ class MetricsWebClientFilterFunctionTests {
 
 	private MetricsWebClientFilterFunction filterFunction;
 
+	private final FaultyTagsProvider tagsProvider = new FaultyTagsProvider();
+
 	private ClientResponse response;
 
 	private ExchangeFunction exchange;
@@ -65,8 +70,8 @@ class MetricsWebClientFilterFunctionTests {
 	@BeforeEach
 	void setup() {
 		this.registry = new SimpleMeterRegistry(SimpleConfig.DEFAULT, new MockClock());
-		this.filterFunction = new MetricsWebClientFilterFunction(this.registry,
-				new DefaultWebClientExchangeTagsProvider(), "http.client.requests", AutoTimer.ENABLED);
+		this.filterFunction = new MetricsWebClientFilterFunction(this.registry, this.tagsProvider,
+				"http.client.requests", AutoTimer.ENABLED);
 		this.response = mock(ClientResponse.class);
 		this.exchange = (r) -> Mono.just(this.response);
 	}
@@ -74,89 +79,141 @@ class MetricsWebClientFilterFunctionTests {
 	@Test
 	void filterShouldRecordTimer() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot")).build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
 		given(this.response.rawStatusCode()).willReturn(HttpStatus.OK.value());
 		this.filterFunction.filter(request, this.exchange).block(Duration.ofSeconds(5));
 		assertThat(this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "200").timer().count()).isEqualTo(1);
+			.tags("method", "GET", "uri", "/projects/spring-boot", "status", "200")
+			.timer()
+			.count()).isEqualTo(1);
 	}
 
 	@Test
 	void filterWhenUriTemplatePresentShouldRecordTimer() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
-				.attribute(URI_TEMPLATE_ATTRIBUTE, "/projects/{project}").build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.attribute(URI_TEMPLATE_ATTRIBUTE, "/projects/{project}")
+			.build();
 		given(this.response.rawStatusCode()).willReturn(HttpStatus.OK.value());
 		this.filterFunction.filter(request, this.exchange).block(Duration.ofSeconds(5));
 		assertThat(this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/{project}", "status", "200").timer().count()).isEqualTo(1);
+			.tags("method", "GET", "uri", "/projects/{project}", "status", "200")
+			.timer()
+			.count()).isEqualTo(1);
 	}
 
 	@Test
 	void filterWhenIoExceptionThrownShouldRecordTimer() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot")).build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
 		ExchangeFunction errorExchange = (r) -> Mono.error(new IOException());
-		this.filterFunction.filter(request, errorExchange).onErrorResume(IOException.class, (t) -> Mono.empty())
-				.block(Duration.ofSeconds(5));
+		this.filterFunction.filter(request, errorExchange)
+			.onErrorResume(IOException.class, (t) -> Mono.empty())
+			.block(Duration.ofSeconds(5));
 		assertThat(this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "IO_ERROR").timer().count())
-						.isEqualTo(1);
+			.tags("method", "GET", "uri", "/projects/spring-boot", "status", "IO_ERROR")
+			.timer()
+			.count()).isEqualTo(1);
 	}
 
 	@Test
 	void filterWhenExceptionThrownShouldRecordTimer() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot")).build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
 		ExchangeFunction exchange = (r) -> Mono.error(new IllegalArgumentException());
-		this.filterFunction.filter(request, exchange).onErrorResume(IllegalArgumentException.class, (t) -> Mono.empty())
-				.block(Duration.ofSeconds(5));
+		this.filterFunction.filter(request, exchange)
+			.onErrorResume(IllegalArgumentException.class, (t) -> Mono.empty())
+			.block(Duration.ofSeconds(5));
 		assertThat(this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR").timer().count())
-						.isEqualTo(1);
+			.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR")
+			.timer()
+			.count()).isEqualTo(1);
 	}
 
 	@Test
 	void filterWhenCancelThrownShouldRecordTimer() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot")).build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
 		given(this.response.rawStatusCode()).willReturn(HttpStatus.OK.value());
 		Mono<ClientResponse> filter = this.filterFunction.filter(request, this.exchange);
 		StepVerifier.create(filter).thenCancel().verify(Duration.ofSeconds(5));
 		assertThat(this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR").timer().count())
-						.isEqualTo(1);
-		assertThatThrownBy(() -> this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "200").timer())
-						.isInstanceOf(MeterNotFoundException.class);
+			.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR")
+			.timer()
+			.count()).isEqualTo(1);
+		assertThatExceptionOfType(MeterNotFoundException.class)
+			.isThrownBy(() -> this.registry.get("http.client.requests")
+				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "200")
+				.timer());
 	}
 
 	@Test
 	void filterWhenCancelAfterResponseThrownShouldNotRecordTimer() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot")).build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
 		given(this.response.rawStatusCode()).willReturn(HttpStatus.OK.value());
 		Mono<ClientResponse> filter = this.filterFunction.filter(request, this.exchange);
 		StepVerifier.create(filter).expectNextCount(1).thenCancel().verify(Duration.ofSeconds(5));
 		assertThat(this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "200").timer().count()).isEqualTo(1);
-		assertThatThrownBy(() -> this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR").timer())
-						.isInstanceOf(MeterNotFoundException.class);
+			.tags("method", "GET", "uri", "/projects/spring-boot", "status", "200")
+			.timer()
+			.count()).isEqualTo(1);
+		assertThatExceptionOfType(MeterNotFoundException.class)
+			.isThrownBy(() -> this.registry.get("http.client.requests")
+				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR")
+				.timer());
 	}
 
 	@Test
-	void filterWhenExceptionAndRetryShouldNotCumulateRecordTime() {
+	void filterWhenExceptionAndRetryShouldNotAccumulateRecordTime() {
 		ClientRequest request = ClientRequest
-				.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot")).build();
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
 		ExchangeFunction exchange = (r) -> Mono.error(new IllegalArgumentException())
-				.delaySubscription(Duration.ofMillis(300)).cast(ClientResponse.class);
-		this.filterFunction.filter(request, exchange).retry(1)
-				.onErrorResume(IllegalArgumentException.class, (t) -> Mono.empty()).block(Duration.ofSeconds(5));
+			.delaySubscription(Duration.ofMillis(1000))
+			.cast(ClientResponse.class);
+		this.filterFunction.filter(request, exchange)
+			.retry(1)
+			.onErrorResume(IllegalArgumentException.class, (t) -> Mono.empty())
+			.block(Duration.ofSeconds(5));
 		Timer timer = this.registry.get("http.client.requests")
-				.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR").timer();
+			.tags("method", "GET", "uri", "/projects/spring-boot", "status", "CLIENT_ERROR")
+			.timer();
 		assertThat(timer.count()).isEqualTo(2);
-		assertThat(timer.max(TimeUnit.MILLISECONDS)).isLessThan(600);
+		assertThat(timer.max(TimeUnit.MILLISECONDS)).isLessThan(2000);
+	}
+
+	@Test
+	void whenMetricsRecordingFailsThenFilteringSucceeds() {
+		ClientRequest request = ClientRequest
+			.create(HttpMethod.GET, URI.create("https://example.com/projects/spring-boot"))
+			.build();
+		given(this.response.rawStatusCode()).willReturn(HttpStatus.OK.value());
+		this.tagsProvider.failOnce();
+		this.filterFunction.filter(request, this.exchange).block(Duration.ofSeconds(5));
+	}
+
+	static class FaultyTagsProvider extends DefaultWebClientExchangeTagsProvider {
+
+		private final AtomicBoolean fail = new AtomicBoolean(false);
+
+		@Override
+		public Iterable<Tag> tags(ClientRequest request, ClientResponse response, Throwable throwable) {
+			if (this.fail.compareAndSet(true, false)) {
+				throw new RuntimeException();
+			}
+			return super.tags(request, response, throwable);
+		}
+
+		void failOnce() {
+			this.fail.set(true);
+		}
+
 	}
 
 }

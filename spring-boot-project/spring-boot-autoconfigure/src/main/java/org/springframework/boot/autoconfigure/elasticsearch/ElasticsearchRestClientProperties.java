@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,84 +17,55 @@
 package org.springframework.boot.autoconfigure.elasticsearch;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+
+import org.elasticsearch.client.RestClient;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuration properties for Elasticsearch REST clients.
+ * Configuration properties specific to Elasticsearch's {@link RestClient} and
+ * {@link org.elasticsearch.client.RestHighLevelClient}.
  *
  * @author Brian Clozel
  * @since 2.1.0
  */
-@ConfigurationProperties(prefix = "spring.elasticsearch.rest")
+@ConfigurationProperties(prefix = "spring.elasticsearch.restclient")
 public class ElasticsearchRestClientProperties {
 
-	/**
-	 * Comma-separated list of the Elasticsearch instances to use.
-	 */
-	private List<String> uris = new ArrayList<>(Collections.singletonList("http://localhost:9200"));
+	private final Sniffer sniffer = new Sniffer();
 
-	/**
-	 * Credentials username.
-	 */
-	private String username;
-
-	/**
-	 * Credentials password.
-	 */
-	private String password;
-
-	/**
-	 * Connection timeout.
-	 */
-	private Duration connectionTimeout = Duration.ofSeconds(1);
-
-	/**
-	 * Read timeout.
-	 */
-	private Duration readTimeout = Duration.ofSeconds(30);
-
-	public List<String> getUris() {
-		return this.uris;
+	public Sniffer getSniffer() {
+		return this.sniffer;
 	}
 
-	public void setUris(List<String> uris) {
-		this.uris = uris;
-	}
+	public static class Sniffer {
 
-	public String getUsername() {
-		return this.username;
-	}
+		/**
+		 * Interval between consecutive ordinary sniff executions.
+		 */
+		private Duration interval = Duration.ofMinutes(5);
 
-	public void setUsername(String username) {
-		this.username = username;
-	}
+		/**
+		 * Delay of a sniff execution scheduled after a failure.
+		 */
+		private Duration delayAfterFailure = Duration.ofMinutes(1);
 
-	public String getPassword() {
-		return this.password;
-	}
+		public Duration getInterval() {
+			return this.interval;
+		}
 
-	public void setPassword(String password) {
-		this.password = password;
-	}
+		public void setInterval(Duration interval) {
+			this.interval = interval;
+		}
 
-	public Duration getConnectionTimeout() {
-		return this.connectionTimeout;
-	}
+		public Duration getDelayAfterFailure() {
+			return this.delayAfterFailure;
+		}
 
-	public void setConnectionTimeout(Duration connectionTimeout) {
-		this.connectionTimeout = connectionTimeout;
-	}
+		public void setDelayAfterFailure(Duration delayAfterFailure) {
+			this.delayAfterFailure = delayAfterFailure;
+		}
 
-	public Duration getReadTimeout() {
-		return this.readTimeout;
-	}
-
-	public void setReadTimeout(Duration readTimeout) {
-		this.readTimeout = readTimeout;
 	}
 
 }

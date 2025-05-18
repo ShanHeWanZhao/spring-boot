@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,9 +34,9 @@ import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link EnvironmentPostProcessorApplicationListener}.
@@ -50,19 +50,21 @@ class EnvironmentPostProcessorApplicationListenerTests {
 	private DefaultBootstrapContext bootstrapContext = spy(new DefaultBootstrapContext());
 
 	private EnvironmentPostProcessorApplicationListener listener = new EnvironmentPostProcessorApplicationListener(
-			EnvironmentPostProcessorsFactory.of(TestEnvironmentPostProcessor.class), this.deferredLogs);
+			(classLoader) -> EnvironmentPostProcessorsFactory.of(TestEnvironmentPostProcessor.class),
+			this.deferredLogs);
 
 	@Test
 	void createUsesSpringFactories() {
 		EnvironmentPostProcessorApplicationListener listener = new EnvironmentPostProcessorApplicationListener();
-		assertThat(listener.getEnvironmentPostProcessors(this.bootstrapContext)).hasSizeGreaterThan(1);
+		assertThat(listener.getEnvironmentPostProcessors(null, this.bootstrapContext)).hasSizeGreaterThan(1);
 	}
 
 	@Test
 	void createWhenHasFactoryUsesFactory() {
 		EnvironmentPostProcessorApplicationListener listener = new EnvironmentPostProcessorApplicationListener(
 				EnvironmentPostProcessorsFactory.of(TestEnvironmentPostProcessor.class));
-		List<EnvironmentPostProcessor> postProcessors = listener.getEnvironmentPostProcessors(this.bootstrapContext);
+		List<EnvironmentPostProcessor> postProcessors = listener.getEnvironmentPostProcessors(null,
+				this.bootstrapContext);
 		assertThat(postProcessors).hasSize(1);
 		assertThat(postProcessors.get(0)).isInstanceOf(TestEnvironmentPostProcessor.class);
 	}
@@ -103,7 +105,7 @@ class EnvironmentPostProcessorApplicationListenerTests {
 		ConfigurableApplicationContext context = mock(ConfigurableApplicationContext.class);
 		ApplicationPreparedEvent event = new ApplicationPreparedEvent(application, new String[0], context);
 		this.listener.onApplicationEvent(event);
-		verify(this.deferredLogs).switchOverAll();
+		then(this.deferredLogs).should().switchOverAll();
 	}
 
 	@Test
@@ -113,7 +115,7 @@ class EnvironmentPostProcessorApplicationListenerTests {
 		ApplicationFailedEvent event = new ApplicationFailedEvent(application, new String[0], context,
 				new RuntimeException());
 		this.listener.onApplicationEvent(event);
-		verify(this.deferredLogs).switchOverAll();
+		then(this.deferredLogs).should().switchOverAll();
 	}
 
 	static class TestEnvironmentPostProcessor implements EnvironmentPostProcessor {

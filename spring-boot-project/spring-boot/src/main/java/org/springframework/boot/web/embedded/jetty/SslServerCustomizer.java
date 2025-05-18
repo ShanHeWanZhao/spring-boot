@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ResourceUtils;
+import org.springframework.util.StringUtils;
 
 /**
  * {@link JettyServerCustomizer} that configures SSL on the given Jetty server instance.
@@ -51,6 +52,7 @@ import org.springframework.util.ResourceUtils;
  * @author Brian Clozel
  * @author Olivier Lamy
  * @author Chris Bono
+ * @author Cyril Dangerville
  */
 class SslServerCustomizer implements JettyServerCustomizer {
 
@@ -106,10 +108,25 @@ class SslServerCustomizer implements JettyServerCustomizer {
 	private ServerConnector createHttp11ServerConnector(Server server, HttpConfiguration config,
 			SslContextFactory.Server sslContextFactory) {
 		HttpConnectionFactory connectionFactory = new HttpConnectionFactory(config);
-		SslConnectionFactory sslConnectionFactory = new SslConnectionFactory(sslContextFactory,
-				HttpVersion.HTTP_1_1.asString());
-		return new SslValidatingServerConnector(server, sslContextFactory, this.ssl.getKeyAlias(), sslConnectionFactory,
-				connectionFactory);
+		return new SslValidatingServerConnector(server, sslContextFactory, this.ssl.getKeyAlias(),
+				createSslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()), connectionFactory);
+	}
+
+	private SslConnectionFactory createSslConnectionFactory(SslContextFactory.Server sslContextFactory,
+			String protocol) {
+		try {
+			return new SslConnectionFactory(sslContextFactory, protocol);
+		}
+		catch (NoSuchMethodError ex) {
+			// Jetty 10
+			try {
+				return SslConnectionFactory.class.getConstructor(SslContextFactory.Server.class, String.class)
+					.newInstance(sslContextFactory, protocol);
+			}
+			catch (Exception ex2) {
+				throw new RuntimeException(ex2);
+			}
+		}
 	}
 
 	private boolean isJettyAlpnPresent() {
@@ -129,7 +146,7 @@ class SslServerCustomizer implements JettyServerCustomizer {
 		if (isConscryptPresent()) {
 			sslContextFactory.setProvider("Conscrypt");
 		}
-		SslConnectionFactory ssl = new SslConnectionFactory(sslContextFactory, alpn.getProtocol());
+		SslConnectionFactory ssl = createSslConnectionFactory(sslContextFactory, alpn.getProtocol());
 		return new SslValidatingServerConnector(server, sslContextFactory, this.ssl.getKeyAlias(), ssl, alpn, h2, http);
 	}
 
@@ -168,6 +185,10 @@ class SslServerCustomizer implements JettyServerCustomizer {
 		}
 		if (sslStoreProvider != null) {
 			try {
+				String keyPassword = sslStoreProvider.getKeyPassword();
+				if (keyPassword != null) {
+					factory.setKeyManagerPassword(keyPassword);
+				}
 				factory.setKeyStore(sslStoreProvider.getKeyStore());
 				factory.setTrustStore(sslStoreProvider.getTrustStore());
 			}
@@ -201,18 +222,24 @@ class SslServerCustomizer implements JettyServerCustomizer {
 	}
 
 	private void configureSslKeyStore(SslContextFactory.Server factory, Ssl ssl) {
-		try {
-			URL url = ResourceUtils.getURL(ssl.getKeyStore());
-			factory.setKeyStoreResource(Resource.newResource(url));
+		String keystoreType = (ssl.getKeyStoreType() != null) ? ssl.getKeyStoreType() : "JKS";
+		String keystoreLocation = ssl.getKeyStore();
+		if (keystoreType.equalsIgnoreCase("PKCS11")) {
+			Assert.state(!StringUtils.hasText(keystoreLocation),
+					() -> "Keystore location '" + keystoreLocation + "' must be empty or null for PKCS11 key stores");
 		}
-		catch (Exception ex) {
-			throw new WebServerException("Could not load key store '" + ssl.getKeyStore() + "'", ex);
+		else {
+			try {
+				URL url = ResourceUtils.getURL(keystoreLocation);
+				factory.setKeyStoreResource(Resource.newResource(url));
+			}
+			catch (Exception ex) {
+				throw new WebServerException("Could not load key store '" + keystoreLocation + "'", ex);
+			}
 		}
-		if (ssl.getKeyStoreType() != null) {
-			factory.setKeyStoreType(ssl.getKeyStoreType());
-		}
+		factory.setKeyStoreType(keystoreType);
 		if (ssl.getKeyStoreProvider() != null) {
-			factory.setKeyStoreProvider(ssl.getKeyStoreProvider());
+			factory.setKeyStoreProvider(this.ssl.getKeyStoreProvider());
 		}
 	}
 

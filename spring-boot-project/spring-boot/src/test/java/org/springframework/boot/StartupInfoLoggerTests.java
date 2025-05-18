@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,18 @@ package org.springframework.boot;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.time.Duration;
 
 import org.apache.commons.logging.Log;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import org.springframework.boot.system.ApplicationPid;
-import org.springframework.util.StopWatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link StartupInfoLogger}.
@@ -46,7 +46,7 @@ class StartupInfoLoggerTests {
 		given(this.log.isInfoEnabled()).willReturn(true);
 		new StartupInfoLogger(getClass()).logStarting(this.log);
 		ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-		verify(this.log).info(captor.capture());
+		then(this.log).should().info(captor.capture());
 		assertThat(captor.getValue().toString()).contains("Starting " + getClass().getSimpleName() + " using Java "
 				+ System.getProperty("java.version") + " on " + InetAddress.getLocalHost().getHostName() + " with PID "
 				+ new ApplicationPid() + " (started by " + System.getProperty("user.name") + " in "
@@ -55,13 +55,11 @@ class StartupInfoLoggerTests {
 
 	@Test
 	void startedFormat() {
-		StopWatch stopWatch = new StopWatch();
-		stopWatch.start();
 		given(this.log.isInfoEnabled()).willReturn(true);
-		stopWatch.stop();
-		new StartupInfoLogger(getClass()).logStarted(this.log, stopWatch);
+		Duration timeTakenToStartup = Duration.ofMillis(10);
+		new StartupInfoLogger(getClass()).logStarted(this.log, timeTakenToStartup);
 		ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-		verify(this.log).info(captor.capture());
+		then(this.log).should().info(captor.capture());
 		assertThat(captor.getValue().toString()).matches("Started " + getClass().getSimpleName()
 				+ " in \\d+\\.\\d{1,3} seconds \\(JVM running for \\d+\\.\\d{1,3}\\)");
 	}

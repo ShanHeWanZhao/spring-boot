@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,13 +70,18 @@ public class SpringBootPlugin implements Plugin<Project> {
 	 */
 	public static final String BOOT_BUILD_IMAGE_TASK_NAME = "bootBuildImage";
 
+	static final String BOOT_RUN_TASK_NAME = "bootRun";
+
 	/**
 	 * The name of the {@code developmentOnly} configuration.
 	 * @since 2.3.0
 	 */
 	public static final String DEVELOPMENT_ONLY_CONFIGURATION_NAME = "developmentOnly";
 
-	static final String PRODUCTION_RUNTIME_CLASSPATH_NAME = "productionRuntimeClasspath";
+	/**
+	 * The name of the {@code productionRuntimeClasspath} configuration.
+	 */
+	public static final String PRODUCTION_RUNTIME_CLASSPATH_CONFIGURATION_NAME = "productionRuntimeClasspath";
 
 	/**
 	 * The coordinates {@code (group:name:version)} of the
@@ -95,10 +100,8 @@ public class SpringBootPlugin implements Plugin<Project> {
 
 	private void verifyGradleVersion() {
 		GradleVersion currentVersion = GradleVersion.current();
-		if (currentVersion.compareTo(GradleVersion.version("5.6")) < 0
-				|| (currentVersion.getBaseVersion().compareTo(GradleVersion.version("6.0")) >= 0
-						&& currentVersion.compareTo(GradleVersion.version("6.3")) < 0)) {
-			throw new GradleException("Spring Boot plugin requires Gradle 5 (5.6.x only) or Gradle 6 (6.3 or later). "
+		if (currentVersion.compareTo(GradleVersion.version("6.8")) < 0) {
+			throw new GradleException("Spring Boot plugin requires Gradle 6.8.x, 6.9.x, or 7.x. "
 					+ "The current version is " + currentVersion);
 		}
 	}
@@ -115,10 +118,11 @@ public class SpringBootPlugin implements Plugin<Project> {
 	}
 
 	private void registerPluginActions(Project project, Configuration bootArchives) {
-		SinglePublishedArtifact singlePublishedArtifact = new SinglePublishedArtifact(bootArchives.getArtifacts());
+		SinglePublishedArtifact singlePublishedArtifact = new SinglePublishedArtifact(bootArchives,
+				project.getArtifacts());
 		List<PluginApplicationAction> actions = Arrays.asList(new JavaPluginAction(singlePublishedArtifact),
-				new WarPluginAction(singlePublishedArtifact), new MavenPluginAction(bootArchives.getUploadTaskName()),
-				new DependencyManagementPluginAction(), new ApplicationPluginAction(), new KotlinPluginAction());
+				new WarPluginAction(singlePublishedArtifact), new DependencyManagementPluginAction(),
+				new ApplicationPluginAction(), new KotlinPluginAction());
 		for (PluginApplicationAction action : actions) {
 			withPluginClassOfAction(action,
 					(pluginClass) -> project.getPlugins().withType(pluginClass, (plugin) -> action.execute(project)));
@@ -127,12 +131,15 @@ public class SpringBootPlugin implements Plugin<Project> {
 
 	private void withPluginClassOfAction(PluginApplicationAction action,
 			Consumer<Class<? extends Plugin<? extends Project>>> consumer) {
+		Class<? extends Plugin<? extends Project>> pluginClass;
 		try {
-			consumer.accept(action.getPluginClass());
+			pluginClass = action.getPluginClass();
 		}
 		catch (Throwable ex) {
-			// Plugin class unavailable. Continue.
+			// Plugin class unavailable.
+			return;
 		}
+		consumer.accept(pluginClass);
 	}
 
 }

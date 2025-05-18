@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.boot.system;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.condition.EnabledOnJre;
 import org.junit.jupiter.api.condition.JRE;
 
@@ -131,6 +132,48 @@ class JavaVersionTests {
 	@EnabledOnJre(JRE.JAVA_16)
 	void currentJavaVersionSixteen() {
 		assertThat(JavaVersion.getJavaVersion()).isEqualTo(JavaVersion.SIXTEEN);
+	}
+
+	@Test
+	@EnabledOnJre(JRE.JAVA_17)
+	void currentJavaVersionSeventeen() {
+		assertThat(JavaVersion.getJavaVersion()).isEqualTo(JavaVersion.SEVENTEEN);
+	}
+
+	@Test
+	@EnabledOnJre(JRE.JAVA_18)
+	void currentJavaVersionEighteen() {
+		assertThat(JavaVersion.getJavaVersion()).isEqualTo(JavaVersion.EIGHTEEN);
+	}
+
+	@Test
+	@EnabledIf("java19")
+	void currentJavaVersionNineteen() {
+		assertThat(JavaVersion.getJavaVersion()).isEqualTo(JavaVersion.NINETEEN);
+	}
+
+	@Test
+	@EnabledIf("java20")
+	void currentJavaVersionTwenty() {
+		assertThat(JavaVersion.getJavaVersion()).isEqualTo(JavaVersion.TWENTY);
+	}
+
+	@Test
+	@EnabledIf("java21")
+	void currentJavaVersionTwentyOne() {
+		assertThat(JavaVersion.getJavaVersion()).isEqualTo(JavaVersion.TWENTY_ONE);
+	}
+
+	static boolean java19() {
+		return "19".equals(System.getProperty("java.version"));
+	}
+
+	static boolean java20() {
+		return System.getProperty("java.version").startsWith("20");
+	}
+
+	static boolean java21() {
+		return System.getProperty("java.version").startsWith("21");
 	}
 
 }

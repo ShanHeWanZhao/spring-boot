@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,9 +105,8 @@ class ProjectGenerationRequest {
 	}
 
 	/**
-	 * Whether or not the project archive should be extracted in the output location. If
-	 * the {@link #getOutput() output} ends with "/", the project is extracted
-	 * automatically.
+	 * Whether the project archive should be extracted in the output location. If the
+	 * {@link #getOutput() output} ends with "/", the project is extracted automatically.
 	 * @return {@code true} if the archive should be extracted, otherwise {@code false}
 	 */
 	boolean isExtract() {
@@ -191,7 +190,7 @@ class ProjectGenerationRequest {
 	}
 
 	/**
-	 * The type of project to generate. Should match one of the advertized type that the
+	 * The type of project to generate. Should match one of the advertised type that the
 	 * service supports. If not set, the default is retrieved from the service metadata.
 	 * @return the project type
 	 */
@@ -242,7 +241,7 @@ class ProjectGenerationRequest {
 	}
 
 	/**
-	 * Whether or not the type should be detected based on the build and format value.
+	 * Whether the type should be detected based on the build and format value.
 	 * @return {@code true} if type detection will be performed, otherwise {@code false}
 	 */
 	boolean isDetectType() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,16 +88,9 @@ class BasicErrorControllerIntegrationTests {
 	void testErrorForMachineClientDefault() {
 		load();
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl("?trace=true"), Map.class);
-		assertErrorAttributes(entity.getBody(), "500", "Internal Server Error", null, "", "/");
+		assertErrorAttributes(entity.getBody(), "500", "Internal Server Error", null, null, "/");
 		assertThat(entity.getBody()).doesNotContainKey("exception");
 		assertThat(entity.getBody()).doesNotContainKey("trace");
-	}
-
-	@Test
-	void testErrorForMachineClientWithTraceParamsTrue() {
-		load("--server.error.include-exception=true", "--server.error.include-stacktrace=on-trace-param",
-				"--server.error.include-message=on-param");
-		exceptionWithStackTraceAndMessage("?trace=true&message=true");
 	}
 
 	@Test
@@ -155,7 +148,7 @@ class BasicErrorControllerIntegrationTests {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void exceptionWithoutStackTraceAndMessage(String path) {
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl(path), Map.class);
-		assertErrorAttributes(entity.getBody(), "500", "Internal Server Error", IllegalStateException.class, "", "/");
+		assertErrorAttributes(entity.getBody(), "500", "Internal Server Error", IllegalStateException.class, null, "/");
 		assertThat(entity.getBody()).doesNotContainKey("trace");
 	}
 
@@ -165,7 +158,7 @@ class BasicErrorControllerIntegrationTests {
 		load("--server.error.include-exception=true");
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl("/annotated"), Map.class);
 		assertErrorAttributes(entity.getBody(), "400", "Bad Request", TestConfiguration.Errors.ExpectedException.class,
-				"", "/annotated");
+				null, "/annotated");
 	}
 
 	@Test
@@ -183,7 +176,7 @@ class BasicErrorControllerIntegrationTests {
 		load("--server.error.include-exception=true");
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl("/annotatedNoReason"), Map.class);
 		assertErrorAttributes(entity.getBody(), "406", "Not Acceptable",
-				TestConfiguration.Errors.NoReasonExpectedException.class, "", "/annotatedNoReason");
+				TestConfiguration.Errors.NoReasonExpectedException.class, null, "/annotatedNoReason");
 	}
 
 	@Test
@@ -268,14 +261,14 @@ class BasicErrorControllerIntegrationTests {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void bindingExceptionWithErrors(String param) {
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl("/bind" + param), Map.class);
-		assertErrorAttributes(entity.getBody(), "400", "Bad Request", BindException.class, "", "/bind");
+		assertErrorAttributes(entity.getBody(), "400", "Bad Request", BindException.class, null, "/bind");
 		assertThat(entity.getBody()).containsKey("errors");
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void bindingExceptionWithoutErrors(String param) {
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl("/bind" + param), Map.class);
-		assertErrorAttributes(entity.getBody(), "400", "Bad Request", BindException.class, "", "/bind");
+		assertErrorAttributes(entity.getBody(), "400", "Bad Request", BindException.class, null, "/bind");
 		assertThat(entity.getBody()).doesNotContainKey("errors");
 	}
 
@@ -290,7 +283,7 @@ class BasicErrorControllerIntegrationTests {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void bindingExceptionWithoutMessage(String param) {
 		ResponseEntity<Map> entity = new TestRestTemplate().getForEntity(createUrl("/bind" + param), Map.class);
-		assertErrorAttributes(entity.getBody(), "400", "Bad Request", BindException.class, "", "/bind");
+		assertErrorAttributes(entity.getBody(), "400", "Bad Request", BindException.class, null, "/bind");
 		assertThat(entity.getBody()).doesNotContainKey("errors");
 	}
 
@@ -299,9 +292,11 @@ class BasicErrorControllerIntegrationTests {
 	void testRequestBodyValidationForMachineClient() {
 		load("--server.error.include-exception=true");
 		RequestEntity request = RequestEntity.post(URI.create(createUrl("/bodyValidation")))
-				.accept(MediaType.APPLICATION_JSON).contentType(MediaType.APPLICATION_JSON).body("{}");
+			.accept(MediaType.APPLICATION_JSON)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body("{}");
 		ResponseEntity<Map> entity = new TestRestTemplate().exchange(request, Map.class);
-		assertErrorAttributes(entity.getBody(), "400", "Bad Request", MethodArgumentNotValidException.class, "",
+		assertErrorAttributes(entity.getBody(), "400", "Bad Request", MethodArgumentNotValidException.class, null,
 				"/bodyValidation");
 		assertThat(entity.getBody()).doesNotContainKey("errors");
 	}
@@ -311,7 +306,8 @@ class BasicErrorControllerIntegrationTests {
 	void testBindingExceptionForMachineClientDefault() {
 		load();
 		RequestEntity request = RequestEntity.get(URI.create(createUrl("/bind?trace=true,message=true")))
-				.accept(MediaType.APPLICATION_JSON).build();
+			.accept(MediaType.APPLICATION_JSON)
+			.build();
 		ResponseEntity<Map> entity = new TestRestTemplate().exchange(request, Map.class);
 		assertThat(entity.getBody()).doesNotContainKey("exception");
 		assertThat(entity.getBody()).doesNotContainKey("trace");
@@ -321,8 +317,9 @@ class BasicErrorControllerIntegrationTests {
 	@Test
 	void testConventionTemplateMapping() {
 		load();
-		RequestEntity<?> request = RequestEntity.get(URI.create(createUrl("/noStorage"))).accept(MediaType.TEXT_HTML)
-				.build();
+		RequestEntity<?> request = RequestEntity.get(URI.create(createUrl("/noStorage")))
+			.accept(MediaType.TEXT_HTML)
+			.build();
 		ResponseEntity<String> entity = new TestRestTemplate().exchange(request, String.class);
 		String resp = entity.getBody();
 		assertThat(resp).contains("We are out of storage");
@@ -332,7 +329,8 @@ class BasicErrorControllerIntegrationTests {
 	void testIncompatibleMediaType() {
 		load();
 		RequestEntity<?> request = RequestEntity.get(URI.create(createUrl("/incompatibleType")))
-				.accept(MediaType.TEXT_PLAIN).build();
+			.accept(MediaType.TEXT_PLAIN)
+			.build();
 		ResponseEntity<String> entity = new TestRestTemplate().exchange(request, String.class);
 		assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 		assertThat(entity.getHeaders().getContentType()).isNull();

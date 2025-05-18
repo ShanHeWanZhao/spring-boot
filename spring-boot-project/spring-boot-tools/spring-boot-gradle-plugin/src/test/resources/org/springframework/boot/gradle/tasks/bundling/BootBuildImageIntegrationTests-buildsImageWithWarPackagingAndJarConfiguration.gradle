@@ -1,11 +1,11 @@
+import org.gradle.util.GradleVersion
+
 plugins {
 	id 'war'
 	id 'org.springframework.boot' version '{version}'
 }
 
 bootBuildImage {
-	jar = bootWar.archiveFile
+	builder = "projects.registry.vmware.com/springboot/spring-boot-cnb-builder:0.0.1"
+	archiveFile = bootWar.archiveFile
 }
-
-sourceCompatibility = '1.8'
-targetCompatibility = '1.8'

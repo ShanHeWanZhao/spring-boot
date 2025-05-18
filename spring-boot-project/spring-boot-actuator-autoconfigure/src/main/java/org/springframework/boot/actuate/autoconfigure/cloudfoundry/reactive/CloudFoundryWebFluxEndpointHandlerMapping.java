@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import reactor.core.publisher.Mono;
 import org.springframework.boot.actuate.autoconfigure.cloudfoundry.AccessLevel;
 import org.springframework.boot.actuate.autoconfigure.cloudfoundry.SecurityResponse;
 import org.springframework.boot.actuate.endpoint.EndpointId;
+import org.springframework.boot.actuate.endpoint.ExposableEndpoint;
 import org.springframework.boot.actuate.endpoint.web.EndpointLinksResolver;
 import org.springframework.boot.actuate.endpoint.web.EndpointMapping;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
@@ -56,12 +57,15 @@ class CloudFoundryWebFluxEndpointHandlerMapping extends AbstractWebFluxEndpointH
 
 	private final EndpointLinksResolver linksResolver;
 
+	private final Collection<ExposableEndpoint<?>> allEndpoints;
+
 	CloudFoundryWebFluxEndpointHandlerMapping(EndpointMapping endpointMapping,
 			Collection<ExposableWebEndpoint> endpoints, EndpointMediaTypes endpointMediaTypes,
 			CorsConfiguration corsConfiguration, CloudFoundrySecurityInterceptor securityInterceptor,
-			EndpointLinksResolver linksResolver) {
+			Collection<ExposableEndpoint<?>> allEndpoints) {
 		super(endpointMapping, endpoints, endpointMediaTypes, corsConfiguration, true);
-		this.linksResolver = linksResolver;
+		this.linksResolver = new EndpointLinksResolver(allEndpoints);
+		this.allEndpoints = allEndpoints;
 		this.securityInterceptor = securityInterceptor;
 	}
 
@@ -76,32 +80,36 @@ class CloudFoundryWebFluxEndpointHandlerMapping extends AbstractWebFluxEndpointH
 		return new CloudFoundryLinksHandler();
 	}
 
+	Collection<ExposableEndpoint<?>> getAllEndpoints() {
+		return this.allEndpoints;
+	}
+
 	class CloudFoundryLinksHandler implements LinksHandler {
 
 		@Override
 		public Publisher<ResponseEntity<Object>> links(ServerWebExchange exchange) {
 			ServerHttpRequest request = exchange.getRequest();
 			return CloudFoundryWebFluxEndpointHandlerMapping.this.securityInterceptor.preHandle(exchange, "")
-					.map((securityResponse) -> {
-						if (!securityResponse.getStatus().equals(HttpStatus.OK)) {
-							return new ResponseEntity<>(securityResponse.getStatus());
-						}
-						AccessLevel accessLevel = exchange.getAttribute(AccessLevel.REQUEST_ATTRIBUTE);
-						Map<String, Link> links = CloudFoundryWebFluxEndpointHandlerMapping.this.linksResolver
-								.resolveLinks(request.getURI().toString());
-						return new ResponseEntity<>(
-								Collections.singletonMap("_links", getAccessibleLinks(accessLevel, links)),
-								HttpStatus.OK);
-					});
+				.map((securityResponse) -> {
+					if (!securityResponse.getStatus().equals(HttpStatus.OK)) {
+						return new ResponseEntity<>(securityResponse.getStatus());
+					}
+					AccessLevel accessLevel = exchange.getAttribute(AccessLevel.REQUEST_ATTRIBUTE);
+					Map<String, Link> links = CloudFoundryWebFluxEndpointHandlerMapping.this.linksResolver
+						.resolveLinks(request.getURI().toString());
+					return new ResponseEntity<>(
+							Collections.singletonMap("_links", getAccessibleLinks(accessLevel, links)), HttpStatus.OK);
+				});
 		}
 
 		private Map<String, Link> getAccessibleLinks(AccessLevel accessLevel, Map<String, Link> links) {
 			if (accessLevel == null) {
 				return new LinkedHashMap<>();
 			}
-			return links.entrySet().stream()
-					.filter((entry) -> entry.getKey().equals("self") || accessLevel.isAccessAllowed(entry.getKey()))
-					.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+			return links.entrySet()
+				.stream()
+				.filter((entry) -> entry.getKey().equals("self") || accessLevel.isAccessAllowed(entry.getKey()))
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 		}
 
 		@Override
@@ -132,7 +140,7 @@ class CloudFoundryWebFluxEndpointHandlerMapping extends AbstractWebFluxEndpointH
 		@Override
 		public Mono<ResponseEntity<Object>> handle(ServerWebExchange exchange, Map<String, String> body) {
 			return this.securityInterceptor.preHandle(exchange, this.endpointId.toLowerCaseString())
-					.flatMap((securityResponse) -> flatMapResponse(exchange, body, securityResponse));
+				.flatMap((securityResponse) -> flatMapResponse(exchange, body, securityResponse));
 		}
 
 		private Mono<ResponseEntity<Object>> flatMapResponse(ServerWebExchange exchange, Map<String, String> body,

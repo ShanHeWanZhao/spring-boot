@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.gradle.api.Action;
-import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.file.DirectoryProperty;
+import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.internal.ConventionTask;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.api.tasks.TaskExecutionException;
+import org.gradle.work.DisableCachingByDefault;
 
 import org.springframework.boot.loader.tools.BuildPropertiesWriter;
 import org.springframework.boot.loader.tools.BuildPropertiesWriter.ProjectDetails;
@@ -41,6 +42,7 @@ import org.springframework.boot.loader.tools.BuildPropertiesWriter.ProjectDetail
  * @author Andy Wilkinson
  * @since 2.0.0
  */
+@DisableCachingByDefault(because = "Not worth caching")
 public class BuildInfo extends ConventionTask {
 
 	private final BuildInfoProperties properties = new BuildInfoProperties(getProject());
@@ -48,8 +50,9 @@ public class BuildInfo extends ConventionTask {
 	private final DirectoryProperty destinationDir;
 
 	public BuildInfo() {
-		this.destinationDir = getProject().getObjects().directoryProperty()
-				.convention(getProject().getLayout().getBuildDirectory());
+		this.destinationDir = getProject().getObjects()
+			.directoryProperty()
+			.convention(getProject().getLayout().getBuildDirectory());
 	}
 
 	/**
@@ -59,13 +62,11 @@ public class BuildInfo extends ConventionTask {
 	@TaskAction
 	public void generateBuildProperties() {
 		try {
+			ProjectDetails details = new ProjectDetails(this.properties.getGroup(), this.properties.getArtifact(),
+					this.properties.getVersion(), this.properties.getName(), this.properties.getTime(),
+					coerceToStringValues(this.properties.getAdditional()));
 			new BuildPropertiesWriter(new File(getDestinationDir(), "build-info.properties"))
-					.writeBuildProperties(
-							new ProjectDetails(this.properties.getGroup(),
-									(this.properties.getArtifact() != null) ? this.properties.getArtifact()
-											: "unspecified",
-									this.properties.getVersion(), this.properties.getName(), this.properties.getTime(),
-									coerceToStringValues(this.properties.getAdditional())));
+				.writeBuildProperties(details);
 		}
 		catch (IOException ex) {
 			throw new TaskExecutionException(this, ex);
@@ -74,7 +75,8 @@ public class BuildInfo extends ConventionTask {
 
 	/**
 	 * Returns the directory to which the {@code build-info.properties} file will be
-	 * written. Defaults to the {@link Project#getBuildDir() Project's build directory}.
+	 * written. Defaults to the {@link ProjectLayout#getBuildDirectory() Project's build
+	 * directory}.
 	 * @return the destination directory
 	 */
 	@OutputDirectory
@@ -110,7 +112,7 @@ public class BuildInfo extends ConventionTask {
 
 	private Map<String, String> coerceToStringValues(Map<String, Object> input) {
 		Map<String, String> output = new HashMap<>();
-		input.forEach((key, value) -> output.put(key, value.toString()));
+		input.forEach((key, value) -> output.put(key, (value != null) ? value.toString() : null));
 		return output;
 	}
 

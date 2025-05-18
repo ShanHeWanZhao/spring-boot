@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -64,9 +65,9 @@ class ExtractCommand extends Command {
 					mkDirs(new File(destination, layer));
 				}
 			}
-			try (ZipInputStream zip = new ZipInputStream(new FileInputStream(this.context.getJarFile()))) {
+			try (ZipInputStream zip = new ZipInputStream(new FileInputStream(this.context.getArchiveFile()))) {
 				ZipEntry entry = zip.getNextEntry();
-				Assert.state(entry != null, "File '" + this.context.getJarFile().toString()
+				Assert.state(entry != null, "File '" + this.context.getArchiveFile().toString()
 						+ "' is not compatible with layertools; ensure jar file is valid and launch script is not enabled");
 				while (entry != null) {
 					if (!entry.isDirectory()) {
@@ -96,7 +97,13 @@ class ExtractCommand extends Command {
 		try (OutputStream out = new FileOutputStream(file)) {
 			StreamUtils.copy(zip, out);
 		}
-		Files.setAttribute(file.toPath(), "creationTime", entry.getCreationTime());
+		try {
+			Files.getFileAttributeView(file.toPath(), BasicFileAttributeView.class)
+				.setTimes(entry.getLastModifiedTime(), entry.getLastAccessTime(), entry.getCreationTime());
+		}
+		catch (IOException ex) {
+			// File system does not support setting time attributes. Continue.
+		}
 	}
 
 	private void mkParentDirs(File file) throws IOException {

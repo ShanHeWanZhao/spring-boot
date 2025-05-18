@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.build.mavenplugin.PluginXmlParser.Plugin;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Tests for {@link PluginXmlParser}.
@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @author Andy Wilkinson
  * @author Mike Smithson
  */
-public class PluginXmlParserTests {
+class PluginXmlParserTests {
 
 	private final PluginXmlParser parser = new PluginXmlParser();
 
@@ -45,13 +45,14 @@ public class PluginXmlParserTests {
 		assertThat(plugin.getVersion()).isEqualTo("2.2.0.GRADLE-SNAPSHOT");
 		assertThat(plugin.getGoalPrefix()).isEqualTo("spring-boot");
 		assertThat(plugin.getMojos().stream().map(PluginXmlParser.Mojo::getGoal).collect(Collectors.toList()))
-				.containsExactly("build-info", "help", "repackage", "run", "start", "stop");
+			.containsExactly("build-info", "help", "repackage", "run", "start", "stop");
 	}
 
 	@Test
 	void parseNonExistingFileThrowException() {
-		assertThatThrownBy(() -> this.parser.parse(new File("src/test/resources/nonexistent.xml")))
-				.isInstanceOf(RuntimeException.class).hasCauseInstanceOf(FileNotFoundException.class);
+		assertThatExceptionOfType(RuntimeException.class)
+			.isThrownBy(() -> this.parser.parse(new File("src/test/resources/nonexistent.xml")))
+			.withCauseInstanceOf(FileNotFoundException.class);
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package org.springframework.boot.build.context.properties;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,8 +32,8 @@ class ConfigurationPropertiesTests {
 
 	@Test
 	void whenJsonHasAnIntegerDefaultValueThenItRemainsAnIntegerWhenRead() {
-		Map<String, ConfigurationProperty> properties = ConfigurationProperties
-				.fromFiles(Arrays.asList(new File("src/test/resources/spring-configuration-metadata.json")));
+		ConfigurationProperties properties = ConfigurationProperties
+			.fromFiles(Arrays.asList(new File("src/test/resources/spring-configuration-metadata.json")));
 		assertThat(properties.get("example.counter").getDefaultValue()).isEqualTo(0);
 	}
 

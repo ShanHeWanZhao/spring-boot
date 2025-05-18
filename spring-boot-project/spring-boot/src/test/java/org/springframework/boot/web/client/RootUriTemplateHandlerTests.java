@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
+import static org.mockito.BDDMockito.then;
 
 /**
  * Tests for {@link RootUriTemplateHandler}.
@@ -61,13 +61,13 @@ class RootUriTemplateHandlerTests {
 	@Test
 	void createWithNullRootUriShouldThrowException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new RootUriTemplateHandler((String) null))
-				.withMessageContaining("RootUri must not be null");
+			.withMessageContaining("RootUri must not be null");
 	}
 
 	@Test
 	void createWithNullHandlerShouldThrowException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new RootUriTemplateHandler("https://example.com", null))
-				.withMessageContaining("Handler must not be null");
+			.withMessageContaining("Handler must not be null");
 	}
 
 	@Test
@@ -76,7 +76,7 @@ class RootUriTemplateHandlerTests {
 		given(this.delegate.expand(anyString(), any(Map.class))).willReturn(this.uri);
 		HashMap<String, Object> uriVariables = new HashMap<>();
 		URI expanded = this.handler.expand("/hello", uriVariables);
-		verify(this.delegate).expand("https://example.com/hello", uriVariables);
+		then(this.delegate).should().expand("https://example.com/hello", uriVariables);
 		assertThat(expanded).isEqualTo(this.uri);
 	}
 
@@ -86,7 +86,7 @@ class RootUriTemplateHandlerTests {
 		given(this.delegate.expand(anyString(), any(Map.class))).willReturn(this.uri);
 		HashMap<String, Object> uriVariables = new HashMap<>();
 		URI expanded = this.handler.expand("https://spring.io/hello", uriVariables);
-		verify(this.delegate).expand("https://spring.io/hello", uriVariables);
+		then(this.delegate).should().expand("https://spring.io/hello", uriVariables);
 		assertThat(expanded).isEqualTo(this.uri);
 	}
 
@@ -95,7 +95,7 @@ class RootUriTemplateHandlerTests {
 		given(this.delegate.expand(anyString(), any(Object[].class))).willReturn(this.uri);
 		Object[] uriVariables = new Object[0];
 		URI expanded = this.handler.expand("/hello", uriVariables);
-		verify(this.delegate).expand("https://example.com/hello", uriVariables);
+		then(this.delegate).should().expand("https://example.com/hello", uriVariables);
 		assertThat(expanded).isEqualTo(this.uri);
 	}
 
@@ -104,7 +104,7 @@ class RootUriTemplateHandlerTests {
 		given(this.delegate.expand(anyString(), any(Object[].class))).willReturn(this.uri);
 		Object[] uriVariables = new Object[0];
 		URI expanded = this.handler.expand("https://spring.io/hello", uriVariables);
-		verify(this.delegate).expand("https://spring.io/hello", uriVariables);
+		then(this.delegate).should().expand("https://spring.io/hello", uriVariables);
 		assertThat(expanded).isEqualTo(this.uri);
 	}
 
@@ -116,7 +116,7 @@ class RootUriTemplateHandlerTests {
 		this.handler = RootUriTemplateHandler.addTo(restTemplate, "https://example.com");
 		Object[] uriVariables = new Object[0];
 		URI expanded = this.handler.expand("/hello", uriVariables);
-		verify(this.delegate).expand("https://example.com/hello", uriVariables);
+		then(this.delegate).should().expand("https://example.com/hello", uriVariables);
 		assertThat(expanded).isEqualTo(this.uri);
 	}
 

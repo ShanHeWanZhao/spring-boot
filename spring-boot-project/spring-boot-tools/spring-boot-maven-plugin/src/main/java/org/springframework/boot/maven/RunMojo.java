@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ public class RunMojo extends AbstractRunMojo {
 	private boolean optimizedLaunch;
 
 	@Override
+	@Deprecated
 	protected void logDisabledFork() {
 		super.logDisabledFork();
 		if (hasDevtools()) {
@@ -71,6 +72,7 @@ public class RunMojo extends AbstractRunMojo {
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	protected RunArguments resolveJvmArguments() {
 		RunArguments jvmArguments = super.resolveJvmArguments();
 		if (isFork() && this.optimizedLaunch) {
@@ -114,6 +116,7 @@ public class RunMojo extends AbstractRunMojo {
 	}
 
 	@Override
+	@Deprecated
 	protected void runWithMavenJvm(String startClassName, String... arguments) throws MojoExecutionException {
 		IsolatedThreadGroup threadGroup = new IsolatedThreadGroup(startClassName);
 		Thread launchThread = new Thread(threadGroup, new LaunchRunner(startClassName, arguments), "main");

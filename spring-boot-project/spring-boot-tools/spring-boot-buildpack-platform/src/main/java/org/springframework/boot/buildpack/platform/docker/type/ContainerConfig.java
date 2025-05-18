@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import org.springframework.util.StringUtils;
  *
  * @author Phillip Webb
  * @author Scott Frederick
+ * @author Jeroen Meijer
  * @since 2.3.0
  */
 public class ContainerConfig {
@@ -47,7 +48,8 @@ public class ContainerConfig {
 	private final String json;
 
 	ContainerConfig(String user, ImageReference image, String command, List<String> args, Map<String, String> labels,
-			Map<String, String> binds, Map<String, String> env) throws IOException {
+			List<Binding> bindings, Map<String, String> env, String networkMode, List<String> securityOptions)
+			throws IOException {
 		Assert.notNull(image, "Image must not be null");
 		Assert.hasText(command, "Command must not be empty");
 		ObjectMapper objectMapper = SharedObjectMapper.get();
@@ -64,8 +66,15 @@ public class ContainerConfig {
 		ObjectNode labelsNode = node.putObject("Labels");
 		labels.forEach(labelsNode::put);
 		ObjectNode hostConfigNode = node.putObject("HostConfig");
+		if (networkMode != null) {
+			hostConfigNode.put("NetworkMode", networkMode);
+		}
 		ArrayNode bindsNode = hostConfigNode.putArray("Binds");
-		binds.forEach((source, dest) -> bindsNode.add(source + ":" + dest));
+		bindings.forEach((binding) -> bindsNode.add(binding.toString()));
+		if (securityOptions != null && !securityOptions.isEmpty()) {
+			ArrayNode securityOptsNode = hostConfigNode.putArray("SecurityOpt");
+			securityOptions.forEach(securityOptsNode::add);
+		}
 		this.json = objectMapper.writeValueAsString(node);
 	}
 
@@ -110,9 +119,13 @@ public class ContainerConfig {
 
 		private final Map<String, String> labels = new LinkedHashMap<>();
 
-		private final Map<String, String> binds = new LinkedHashMap<>();
+		private final List<Binding> bindings = new ArrayList<>();
 
 		private final Map<String, String> env = new LinkedHashMap<>();
+
+		private String networkMode;
+
+		private final List<String> securityOptions = new ArrayList<>();
 
 		Update(ImageReference image) {
 			this.image = image;
@@ -121,8 +134,8 @@ public class ContainerConfig {
 		private ContainerConfig run(Consumer<Update> update) {
 			update.accept(this);
 			try {
-				return new ContainerConfig(this.user, this.image, this.command, this.args, this.labels, this.binds,
-						this.env);
+				return new ContainerConfig(this.user, this.image, this.command, this.args, this.labels, this.bindings,
+						this.env, this.networkMode, this.securityOptions);
 			}
 			catch (IOException ex) {
 				throw new IllegalStateException(ex);
@@ -166,21 +179,11 @@ public class ContainerConfig {
 		}
 
 		/**
-		 * Update the container config with an additional bind.
-		 * @param sourceVolume the source volume
-		 * @param dest the bind destination
+		 * Update the container config with an additional binding.
+		 * @param binding the binding
 		 */
-		public void withBind(VolumeName sourceVolume, String dest) {
-			this.binds.put(sourceVolume.toString(), dest);
-		}
-
-		/**
-		 * Update the container config with an additional bind.
-		 * @param source the bind source
-		 * @param dest the bind destination
-		 */
-		public void withBind(String source, String dest) {
-			this.binds.put(source, dest);
+		public void withBinding(Binding binding) {
+			this.bindings.add(binding);
 		}
 
 		/**
@@ -190,6 +193,23 @@ public class ContainerConfig {
 		 */
 		public void withEnv(String name, String value) {
 			this.env.put(name, value);
+		}
+
+		/**
+		 * Update the container config with the network that the build container will
+		 * connect to.
+		 * @param networkMode the network
+		 */
+		public void withNetworkMode(String networkMode) {
+			this.networkMode = networkMode;
+		}
+
+		/**
+		 * Update the container config with a security option.
+		 * @param option the security option
+		 */
+		public void withSecurityOption(String option) {
+			this.securityOptions.add(option);
 		}
 
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ class ConfigDataEnvironmentPostProcessorImportCombinedWithProfileSpecificIntegra
 	@Test
 	void testWithoutProfile() {
 		ConfigurableApplicationContext context = this.application
-				.run("--spring.config.name=configimportwithprofilespecific");
+			.run("--spring.config.name=configimportwithprofilespecific");
 		String value = context.getEnvironment().getProperty("prop");
 		assertThat(value).isEqualTo("fromicwps1");
 	}
@@ -69,7 +69,7 @@ class ConfigDataEnvironmentPostProcessorImportCombinedWithProfileSpecificIntegra
 	@Test
 	void testWithProfile() {
 		ConfigurableApplicationContext context = this.application
-				.run("--spring.config.name=configimportwithprofilespecific", "--spring.profiles.active=prod");
+			.run("--spring.config.name=configimportwithprofilespecific", "--spring.profiles.active=prod");
 		String value = context.getEnvironment().getProperty("prop");
 		assertThat(value).isEqualTo("fromicwps2");
 	}
@@ -82,14 +82,13 @@ class ConfigDataEnvironmentPostProcessorImportCombinedWithProfileSpecificIntegra
 		}
 
 		@Override
-		public List<Resource> resolve(ConfigDataLocationResolverContext context, ConfigDataLocation location)
-				throws ConfigDataLocationNotFoundException, ConfigDataResourceNotFoundException {
+		public List<Resource> resolve(ConfigDataLocationResolverContext context, ConfigDataLocation location) {
 			return Collections.emptyList();
 		}
 
 		@Override
 		public List<Resource> resolveProfileSpecific(ConfigDataLocationResolverContext context,
-				ConfigDataLocation location, Profiles profiles) throws ConfigDataLocationNotFoundException {
+				ConfigDataLocation location, Profiles profiles) {
 			return Collections.singletonList(new Resource(profiles));
 		}
 
@@ -98,8 +97,7 @@ class ConfigDataEnvironmentPostProcessorImportCombinedWithProfileSpecificIntegra
 	static class Loader implements ConfigDataLoader<Resource> {
 
 		@Override
-		public ConfigData load(ConfigDataLoaderContext context, Resource resource)
-				throws IOException, ConfigDataResourceNotFoundException {
+		public ConfigData load(ConfigDataLoaderContext context, Resource resource) throws IOException {
 			List<PropertySource<?>> propertySources = new ArrayList<>();
 			Map<PropertySource<?>, Options> propertySourceOptions = new HashMap<>();
 			propertySources.add(new MapPropertySource("icwps1", Collections.singletonMap("prop", "fromicwps1")));

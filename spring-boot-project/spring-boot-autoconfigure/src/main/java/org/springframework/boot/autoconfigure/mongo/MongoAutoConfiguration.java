@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -41,7 +42,7 @@ import org.springframework.core.env.Environment;
  * @author Scott Frederick
  * @since 1.0.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @ConditionalOnClass(MongoClient.class)
 @EnableConfigurationProperties(MongoProperties.class)
 @ConditionalOnMissingBean(type = "org.springframework.data.mongodb.MongoDatabaseFactory")
@@ -52,7 +53,7 @@ public class MongoAutoConfiguration {
 	public MongoClient mongo(ObjectProvider<MongoClientSettingsBuilderCustomizer> builderCustomizers,
 			MongoClientSettings settings) {
 		return new MongoClientFactory(builderCustomizers.orderedStream().collect(Collectors.toList()))
-				.createMongoClient(settings);
+			.createMongoClient(settings);
 	}
 
 	@Configuration(proxyBeanMethods = false)

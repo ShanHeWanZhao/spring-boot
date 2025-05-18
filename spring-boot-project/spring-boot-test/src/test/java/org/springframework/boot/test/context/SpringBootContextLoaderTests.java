@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,20 +16,28 @@
 
 package org.springframework.boot.test.context;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.boot.web.reactive.context.GenericReactiveWebApplicationContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.MergedContextConfiguration;
 import org.springframework.test.context.TestContext;
 import org.springframework.test.context.TestContextManager;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.support.TestPropertySourceUtils;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -38,6 +46,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Stephane Nicoll
  * @author Scott Frederick
+ * @author Madhura Bhave
  */
 class SpringBootContextLoaderTests {
 
@@ -82,10 +91,9 @@ class SpringBootContextLoaderTests {
 		assertKey(config, "anotherKey", "another=Value");
 	}
 
-	@Test
+	@Test // gh-4384
 	@Disabled
 	void environmentPropertiesNewLineInValue() {
-		// gh-4384
 		Map<String, Object> config = getMergedContextConfigurationProperties(NewLineInValue.class);
 		assertKey(config, "key", "myValue");
 		assertKey(config, "variables", "foo=FOO\n bar=BAR");
@@ -106,6 +114,56 @@ class SpringBootContextLoaderTests {
 		assertThat(getActiveProfiles(ActiveProfileWithComma.class)).containsExactly("profile1,2");
 	}
 
+	@Test
+	// gh-28776
+	void testPropertyValuesShouldTakePrecedenceWhenInlinedPropertiesPresent() {
+		TestContext context = new ExposedTestContextManager(SimpleConfig.class).getExposedTestContext();
+		StandardEnvironment environment = (StandardEnvironment) context.getApplicationContext().getEnvironment();
+		TestPropertyValues.of("key=thisValue").applyTo(environment);
+		assertThat(environment.getProperty("key")).isEqualTo("thisValue");
+		assertThat(environment.getPropertySources().get("active-test-profiles")).isNull();
+	}
+
+	@Test
+	void testPropertyValuesShouldTakePrecedenceWhenInlinedPropertiesPresentAndProfilesActive() {
+		TestContext context = new ExposedTestContextManager(ActiveProfileWithInlinedProperties.class)
+			.getExposedTestContext();
+		StandardEnvironment environment = (StandardEnvironment) context.getApplicationContext().getEnvironment();
+		TestPropertyValues.of("key=thisValue").applyTo(environment);
+		assertThat(environment.getProperty("key")).isEqualTo("thisValue");
+		assertThat(environment.getPropertySources().get("active-test-profiles")).isNotNull();
+	}
+
+	@Test
+	void propertySourceOrdering() {
+		TestContext context = new ExposedTestContextManager(PropertySourceOrdering.class).getExposedTestContext();
+		ConfigurableEnvironment environment = (ConfigurableEnvironment) context.getApplicationContext()
+			.getEnvironment();
+		List<String> names = environment.getPropertySources()
+			.stream()
+			.map(PropertySource::getName)
+			.collect(Collectors.toList());
+		String last = names.remove(names.size() - 1);
+		assertThat(names).containsExactly("configurationProperties", "Inlined Test Properties", "commandLineArgs",
+				"servletConfigInitParams", "servletContextInitParams", "systemProperties", "systemEnvironment",
+				"random");
+		assertThat(last).startsWith("Config resource");
+	}
+
+	@Test
+	void whenEnvironmentChangesWebApplicationTypeToNoneThenContextTypeChangesAccordingly() {
+		TestContext context = new ExposedTestContextManager(ChangingWebApplicationTypeToNone.class)
+			.getExposedTestContext();
+		assertThat(context.getApplicationContext()).isNotInstanceOf(WebApplicationContext.class);
+	}
+
+	@Test
+	void whenEnvironmentChangesWebApplicationTypeToReactiveThenContextTypeChangesAccordingly() {
+		TestContext context = new ExposedTestContextManager(ChangingWebApplicationTypeToReactive.class)
+			.getExposedTestContext();
+		assertThat(context.getApplicationContext()).isInstanceOf(GenericReactiveWebApplicationContext.class);
+	}
+
 	private String[] getActiveProfiles(Class<?> testClass) {
 		TestContext testContext = new ExposedTestContextManager(testClass).getExposedTestContext();
 		ApplicationContext applicationContext = testContext.getApplicationContext();
@@ -124,64 +182,77 @@ class SpringBootContextLoaderTests {
 		assertThat(actual.get(key)).isEqualTo(value);
 	}
 
-	@SpringBootTest({ "key=myValue", "anotherKey:anotherValue" })
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = { "key=myValue", "anotherKey:anotherValue" }, classes = Config.class)
 	static class SimpleConfig {
 
 	}
 
-	@SpringBootTest(properties = { "key=myValue", "anotherKey:anotherValue" })
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = { "key=myValue", "anotherKey:anotherValue" }, classes = Config.class)
 	static class SimpleConfigNonAlias {
 
 	}
 
-	@SpringBootTest("server.port=2345")
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = "server.port=2345", classes = Config.class)
 	static class OverrideConfig {
 
 	}
 
-	@SpringBootTest({ "key=myValue", "otherKey=otherValue" })
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = { "key=myValue", "otherKey=otherValue" }, classes = Config.class)
 	static class AppendConfig {
 
 	}
 
-	@SpringBootTest({ "key=my=Value", "anotherKey:another:Value" })
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = { "key=my=Value", "anotherKey:another:Value" }, classes = Config.class)
 	static class SameSeparatorInValue {
 
 	}
 
-	@SpringBootTest({ "key=my:Value", "anotherKey:another=Value" })
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = { "key=my:Value", "anotherKey:another=Value" }, classes = Config.class)
 	static class AnotherSeparatorInValue {
 
 	}
 
-	@SpringBootTest({ "key=myValue", "variables=foo=FOO\n bar=BAR" })
-	@ContextConfiguration(classes = Config.class)
+	@SpringBootTest(properties = { "key=myValue", "variables=foo=FOO\n bar=BAR" }, classes = Config.class)
 	static class NewLineInValue {
 
 	}
 
-	@SpringBootTest
+	@SpringBootTest(classes = Config.class)
 	@ActiveProfiles({ "profile1", "profile2" })
-	@ContextConfiguration(classes = Config.class)
 	static class MultipleActiveProfiles {
 
 	}
 
-	@SpringBootTest
+	@SpringBootTest(classes = Config.class)
 	@ActiveProfiles({ "profile1,2" })
-	@ContextConfiguration(classes = Config.class)
 	static class ActiveProfileWithComma {
+
+	}
+
+	@SpringBootTest(properties = { "key=myValue" }, classes = Config.class)
+	@ActiveProfiles({ "profile1,2" })
+	static class ActiveProfileWithInlinedProperties {
+
+	}
+
+	@SpringBootTest(classes = Config.class, args = "args", properties = "one=1")
+	@TestPropertySource(properties = "two=2")
+	static class PropertySourceOrdering {
 
 	}
 
 	@Configuration(proxyBeanMethods = false)
 	static class Config {
+
+	}
+
+	@SpringBootTest(classes = Config.class, args = "--spring.main.web-application-type=none")
+	static class ChangingWebApplicationTypeToNone {
+
+	}
+
+	@SpringBootTest(classes = Config.class, args = "--spring.main.web-application-type=reactive")
+	static class ChangingWebApplicationTypeToReactive {
 
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.jar.JarFile;
 
+import org.gradle.api.Action;
+import org.gradle.api.artifacts.Configuration;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,11 +30,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests for {@link BootWar}.
  *
  * @author Andy Wilkinson
+ * @author Scott Frederick
  */
 class BootWarTests extends AbstractBootArchiveTests<BootWar> {
 
 	BootWarTests() {
-		super(BootWar.class, "org.springframework.boot.loader.WarLauncher", "WEB-INF/lib/", "WEB-INF/classes/");
+		super(BootWar.class, "org.springframework.boot.loader.WarLauncher", "WEB-INF/lib/", "WEB-INF/classes/",
+				"WEB-INF/");
 	}
 
 	@Test
@@ -81,18 +85,6 @@ class BootWarTests extends AbstractBootArchiveTests<BootWar> {
 	}
 
 	@Test
-	@Deprecated
-	void devtoolsJarCanBeIncludedWhenItsOnTheProvidedClasspath() throws IOException {
-		getTask().getMainClass().set("com.example.Main");
-		getTask().providedClasspath(jarFile("spring-boot-devtools-0.1.2.jar"));
-		getTask().setExcludeDevtools(false);
-		executeTask();
-		try (JarFile jarFile = new JarFile(getTask().getArchiveFile().get().getAsFile())) {
-			assertThat(jarFile.getEntry("WEB-INF/lib-provided/spring-boot-devtools-0.1.2.jar")).isNotNull();
-		}
-	}
-
-	@Test
 	void webappResourcesInDirectoriesThatOverlapWithLoaderCanBePackaged() throws IOException {
 		File webappDirectory = new File(this.temp, "src/main/webapp");
 		webappDirectory.mkdirs();
@@ -115,12 +107,44 @@ class BootWarTests extends AbstractBootArchiveTests<BootWar> {
 		getTask().providedClasspath(jarFile("provided-library.jar"));
 		executeTask();
 		assertThat(getEntryNames(getTask().getArchiveFile().get().getAsFile()))
-				.containsSubsequence("WEB-INF/lib/library.jar", "WEB-INF/lib-provided/provided-library.jar");
+			.containsSubsequence("WEB-INF/lib/library.jar", "WEB-INF/lib-provided/provided-library.jar");
+	}
+
+	@Test
+	void whenWarIsLayeredClasspathIndexPointsToLayeredLibs() throws IOException {
+		try (JarFile jarFile = new JarFile(createLayeredJar())) {
+			assertThat(entryLines(jarFile, "WEB-INF/classpath.idx")).containsExactly(
+					"- \"WEB-INF/lib/first-library.jar\"", "- \"WEB-INF/lib/second-library.jar\"",
+					"- \"WEB-INF/lib/third-library-SNAPSHOT.jar\"", "- \"WEB-INF/lib/first-project-library.jar\"",
+					"- \"WEB-INF/lib/second-project-library-SNAPSHOT.jar\"");
+		}
+	}
+
+	@Test
+	void classpathIndexPointsToWebInfLibs() throws IOException {
+		try (JarFile jarFile = new JarFile(createPopulatedJar())) {
+			assertThat(jarFile.getManifest().getMainAttributes().getValue("Spring-Boot-Classpath-Index"))
+				.isEqualTo("WEB-INF/classpath.idx");
+			assertThat(entryLines(jarFile, "WEB-INF/classpath.idx")).containsExactly(
+					"- \"WEB-INF/lib/first-library.jar\"", "- \"WEB-INF/lib/second-library.jar\"",
+					"- \"WEB-INF/lib/third-library-SNAPSHOT.jar\"", "- \"WEB-INF/lib/first-project-library.jar\"",
+					"- \"WEB-INF/lib/second-project-library-SNAPSHOT.jar\"");
+		}
 	}
 
 	@Override
 	protected void executeTask() {
 		getTask().copy();
+	}
+
+	@Override
+	void populateResolvedDependencies(Configuration configuration) {
+		getTask().getResolvedDependencies().processConfiguration(getTask().getProject(), configuration);
+	}
+
+	@Override
+	void applyLayered(Action<LayeredSpec> action) {
+		getTask().layered(action);
 	}
 
 }

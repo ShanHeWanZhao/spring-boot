@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint;
 import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint.ApplicationConfigurationProperties;
+import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpointWebExtension;
+import org.springframework.boot.actuate.endpoint.SanitizingFunction;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -30,6 +32,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.ContextConsumer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,33 +44,48 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConfigurationPropertiesReportEndpointAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(ConfigurationPropertiesReportEndpointAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(ConfigurationPropertiesReportEndpointAutoConfiguration.class));
 
 	@Test
 	void runShouldHaveEndpointBean() {
 		this.contextRunner.withUserConfiguration(Config.class)
-				.withPropertyValues("management.endpoints.web.exposure.include=configprops")
-				.run(validateTestProperties("******", "654321"));
+			.withPropertyValues("management.endpoints.web.exposure.include=configprops")
+			.run(validateTestProperties("******", "654321"));
 	}
 
 	@Test
 	void runWhenEnabledPropertyIsFalseShouldNotHaveEndpointBean() {
 		this.contextRunner.withPropertyValues("management.endpoint.configprops.enabled:false")
-				.run((context) -> assertThat(context).doesNotHaveBean(ConfigurationPropertiesReportEndpoint.class));
+			.run((context) -> assertThat(context).doesNotHaveBean(ConfigurationPropertiesReportEndpoint.class));
 	}
 
 	@Test
 	void keysToSanitizeCanBeConfiguredViaTheEnvironment() {
 		this.contextRunner.withUserConfiguration(Config.class)
-				.withPropertyValues("management.endpoint.configprops.keys-to-sanitize: .*pass.*, property")
-				.withPropertyValues("management.endpoints.web.exposure.include=configprops")
-				.run(validateTestProperties("******", "******"));
+			.withPropertyValues("management.endpoint.configprops.keys-to-sanitize: .*pass.*, property")
+			.withPropertyValues("management.endpoints.web.exposure.include=configprops")
+			.run(validateTestProperties("******", "******"));
+	}
+
+	@Test
+	void additionalKeysToSanitizeCanBeConfiguredViaTheEnvironment() {
+		this.contextRunner.withUserConfiguration(Config.class)
+			.withPropertyValues("management.endpoint.configprops.additional-keys-to-sanitize: property")
+			.withPropertyValues("management.endpoints.web.exposure.include=configprops")
+			.run(validateTestProperties("******", "******"));
+	}
+
+	@Test
+	void customSanitizingFunctionsAreAppliedInOrder() {
+		this.contextRunner.withUserConfiguration(Config.class, SanitizingFunctionConfiguration.class)
+			.withPropertyValues("management.endpoints.web.exposure.include=configprops", "test.my-test-property=abc")
+			.run(validateTestProperties("$$$111$$$", "$$$222$$$"));
 	}
 
 	@Test
 	void runWhenNotExposedShouldNotHaveEndpointBean() {
 		this.contextRunner
-				.run((context) -> assertThat(context).doesNotHaveBean(ConfigurationPropertiesReportEndpoint.class));
+			.run((context) -> assertThat(context).doesNotHaveBean(ConfigurationPropertiesReportEndpoint.class));
 	}
 
 	private ContextConsumer<AssertableApplicationContext> validateTestProperties(String dbPassword,
@@ -75,14 +93,26 @@ class ConfigurationPropertiesReportEndpointAutoConfigurationTests {
 		return (context) -> {
 			assertThat(context).hasSingleBean(ConfigurationPropertiesReportEndpoint.class);
 			ConfigurationPropertiesReportEndpoint endpoint = context
-					.getBean(ConfigurationPropertiesReportEndpoint.class);
+				.getBean(ConfigurationPropertiesReportEndpoint.class);
 			ApplicationConfigurationProperties properties = endpoint.configurationProperties();
-			Map<String, Object> nestedProperties = properties.getContexts().get(context.getId()).getBeans()
-					.get("testProperties").getProperties();
+			Map<String, Object> nestedProperties = properties.getContexts()
+				.get(context.getId())
+				.getBeans()
+				.get("testProperties")
+				.getProperties();
 			assertThat(nestedProperties).isNotNull();
 			assertThat(nestedProperties.get("dbPassword")).isEqualTo(dbPassword);
 			assertThat(nestedProperties.get("myTestProperty")).isEqualTo(myTestProperty);
 		};
+	}
+
+	@Test
+	void runWhenOnlyExposedOverJmxShouldHaveEndpointBeanWithoutWebExtension() {
+		this.contextRunner
+			.withPropertyValues("management.endpoints.web.exposure.include=info", "spring.jmx.enabled=true",
+					"management.endpoints.jmx.exposure.include=configprops")
+			.run((context) -> assertThat(context).hasSingleBean(ConfigurationPropertiesReportEndpoint.class)
+				.doesNotHaveBean(ConfigurationPropertiesReportEndpointWebExtension.class));
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -117,6 +147,33 @@ class ConfigurationPropertiesReportEndpointAutoConfigurationTests {
 
 		public void setMyTestProperty(String myTestProperty) {
 			this.myTestProperty = myTestProperty;
+		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	static class SanitizingFunctionConfiguration {
+
+		@Bean
+		@Order(0)
+		SanitizingFunction firstSanitizingFunction() {
+			return (data) -> {
+				if (data.getKey().contains("Password")) {
+					return data.withValue("$$$111$$$");
+				}
+				return data;
+			};
+		}
+
+		@Bean
+		@Order(1)
+		SanitizingFunction secondSanitizingFunction() {
+			return (data) -> {
+				if (data.getKey().contains("Password") || data.getKey().contains("test")) {
+					return data.withValue("$$$222$$$");
+				}
+				return data;
+			};
 		}
 
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 
 package org.springframework.boot.build;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.gradle.api.Project;
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmOptions;
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile;
@@ -25,8 +28,13 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile;
  * plugin. When the plugin is applied:
  *
  * <ul>
- * <li>{@link KotlinCompile} tasks are configured to use {@code apiVersion} and
- * {@code languageVersion} 1.3.
+ * <li>{@link KotlinCompile} tasks are configured to:
+ * <ul>
+ * <li>Use {@code apiVersion} and {@code languageVersion} 1.3.
+ * <li>Use {@code jvmTarget} 1.8.
+ * <li>Treat all warnings as errors
+ * <li>Suppress version warnings
+ * </ul>
  * </ul>
  *
  * <p/>
@@ -36,13 +44,20 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile;
 class KotlinConventions {
 
 	void apply(Project project) {
-		project.getPlugins().withId("org.jetbrains.kotlin.jvm", (plugin) -> {
-			project.getTasks().withType(KotlinCompile.class, (compile) -> {
-				KotlinJvmOptions kotlinOptions = compile.getKotlinOptions();
-				kotlinOptions.setApiVersion("1.3");
-				kotlinOptions.setLanguageVersion("1.3");
-			});
-		});
+		project.getPlugins()
+			.withId("org.jetbrains.kotlin.jvm",
+					(plugin) -> project.getTasks().withType(KotlinCompile.class, this::configure));
+	}
+
+	private void configure(KotlinCompile compile) {
+		KotlinJvmOptions kotlinOptions = compile.getKotlinOptions();
+		kotlinOptions.setApiVersion("1.3");
+		kotlinOptions.setLanguageVersion("1.3");
+		kotlinOptions.setJvmTarget("1.8");
+		kotlinOptions.setAllWarningsAsErrors(true);
+		List<String> freeCompilerArgs = new ArrayList<>(compile.getKotlinOptions().getFreeCompilerArgs());
+		freeCompilerArgs.add("-Xsuppress-version-warnings");
+		compile.getKotlinOptions().setFreeCompilerArgs(freeCompilerArgs);
 	}
 
 }

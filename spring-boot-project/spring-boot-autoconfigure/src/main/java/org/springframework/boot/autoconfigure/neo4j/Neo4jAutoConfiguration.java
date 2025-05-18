@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import org.neo4j.driver.GraphDatabase;
 import org.neo4j.driver.internal.Scheme;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -42,7 +43,6 @@ import org.springframework.boot.autoconfigure.neo4j.Neo4jProperties.Security;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.source.InvalidConfigurationPropertyValueException;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.util.StringUtils;
 
@@ -53,7 +53,7 @@ import org.springframework.util.StringUtils;
  * @author Stephane Nicoll
  * @since 2.4.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @ConditionalOnClass(Driver.class)
 @EnableConfigurationProperties(Neo4jProperties.class)
 public class Neo4jAutoConfiguration {
@@ -91,8 +91,8 @@ public class Neo4jAutoConfiguration {
 		boolean hasKerberosTicket = StringUtils.hasText(kerberosTicket);
 
 		if (hasUsername && hasKerberosTicket) {
-			throw new IllegalStateException(String.format(
-					"Cannot specify both username ('%s') and kerberos ticket ('%s')", username, kerberosTicket));
+			throw new IllegalStateException(String
+				.format("Cannot specify both username ('%s') and kerberos ticket ('%s')", username, kerberosTicket));
 		}
 		if (hasUsername && hasPassword) {
 			return AuthTokens.basic(username, password, realm);
@@ -188,19 +188,20 @@ public class Neo4jAutoConfiguration {
 	private TrustStrategy createTrustStrategy(Neo4jProperties.Security securityProperties, String propertyName,
 			Security.TrustStrategy strategy) {
 		switch (strategy) {
-		case TRUST_ALL_CERTIFICATES:
-			return TrustStrategy.trustAllCertificates();
-		case TRUST_SYSTEM_CA_SIGNED_CERTIFICATES:
-			return TrustStrategy.trustSystemCertificates();
-		case TRUST_CUSTOM_CA_SIGNED_CERTIFICATES:
-			File certFile = securityProperties.getCertFile();
-			if (certFile == null || !certFile.isFile()) {
+			case TRUST_ALL_CERTIFICATES:
+				return TrustStrategy.trustAllCertificates();
+			case TRUST_SYSTEM_CA_SIGNED_CERTIFICATES:
+				return TrustStrategy.trustSystemCertificates();
+			case TRUST_CUSTOM_CA_SIGNED_CERTIFICATES:
+				File certFile = securityProperties.getCertFile();
+				if (certFile == null || !certFile.isFile()) {
+					throw new InvalidConfigurationPropertyValueException(propertyName, strategy.name(),
+							"Configured trust strategy requires a certificate file.");
+				}
+				return TrustStrategy.trustCustomCertificateSignedBy(certFile);
+			default:
 				throw new InvalidConfigurationPropertyValueException(propertyName, strategy.name(),
-						"Configured trust strategy requires a certificate file.");
-			}
-			return TrustStrategy.trustCustomCertificateSignedBy(certFile);
-		default:
-			throw new InvalidConfigurationPropertyValueException(propertyName, strategy.name(), "Unknown strategy.");
+						"Unknown strategy.");
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.boot.autoconfigure.batch;
 
+import java.util.Arrays;
 import java.util.List;
 
 import javax.sql.DataSource;
@@ -44,11 +45,12 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration;
 import org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizers;
+import org.springframework.boot.jdbc.init.DataSourceScriptDatabaseInitializer;
+import org.springframework.boot.sql.init.DatabaseInitializationSettings;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,10 +68,8 @@ import static org.assertj.core.api.Assertions.fail;
 class JobLauncherApplicationRunnerTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(
-					AutoConfigurations.of(DataSourceAutoConfiguration.class, TransactionAutoConfiguration.class))
-			.withUserConfiguration(BatchConfiguration.class)
-			.withPropertyValues("spring.datasource.initialization-mode=never");
+		.withConfiguration(AutoConfigurations.of(DataSourceAutoConfiguration.class, TransactionAutoConfiguration.class))
+		.withUserConfiguration(BatchConfiguration.class);
 
 	@Test
 	void basicExecution() {
@@ -98,8 +98,9 @@ class JobLauncherApplicationRunnerTests {
 		this.contextRunner.run((context) -> {
 			JobLauncherApplicationRunnerContext jobLauncherContext = new JobLauncherApplicationRunnerContext(context);
 			Job job = jobLauncherContext.jobBuilder()
-					.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
-					.incrementer(new RunIdIncrementer()).build();
+				.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
+				.incrementer(new RunIdIncrementer())
+				.build();
 			jobLauncherContext.runner.execute(job, new JobParameters());
 			jobLauncherContext.runner.execute(job, new JobParametersBuilder().addLong("run.id", 1L).toJobParameters());
 			assertThat(jobLauncherContext.jobInstances()).hasSize(1);
@@ -111,7 +112,8 @@ class JobLauncherApplicationRunnerTests {
 		this.contextRunner.run((context) -> {
 			JobLauncherApplicationRunnerContext jobLauncherContext = new JobLauncherApplicationRunnerContext(context);
 			Job job = jobLauncherContext.jobBuilder()
-					.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build()).build();
+				.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
+				.build();
 			// start a job instance
 			JobParameters jobParameters = new JobParametersBuilder().addString("name", "foo").toJobParameters();
 			jobLauncherContext.runner.execute(job, jobParameters);
@@ -127,9 +129,11 @@ class JobLauncherApplicationRunnerTests {
 	void retryFailedExecutionOnNonRestartableJob() {
 		this.contextRunner.run((context) -> {
 			JobLauncherApplicationRunnerContext jobLauncherContext = new JobLauncherApplicationRunnerContext(context);
-			Job job = jobLauncherContext.jobBuilder().preventRestart()
-					.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
-					.incrementer(new RunIdIncrementer()).build();
+			Job job = jobLauncherContext.jobBuilder()
+				.preventRestart()
+				.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
+				.incrementer(new RunIdIncrementer())
+				.build();
 			jobLauncherContext.runner.execute(job, new JobParameters());
 			jobLauncherContext.runner.execute(job, new JobParameters());
 			// A failed job that is not restartable does not re-use the job params of
@@ -149,10 +153,12 @@ class JobLauncherApplicationRunnerTests {
 		this.contextRunner.run((context) -> {
 			JobLauncherApplicationRunnerContext jobLauncherContext = new JobLauncherApplicationRunnerContext(context);
 			Job job = jobLauncherContext.jobBuilder()
-					.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
-					.incrementer(new RunIdIncrementer()).build();
-			JobParameters jobParameters = new JobParametersBuilder().addLong("id", 1L, false).addLong("foo", 2L, false)
-					.toJobParameters();
+				.start(jobLauncherContext.stepBuilder().tasklet(throwingTasklet()).build())
+				.incrementer(new RunIdIncrementer())
+				.build();
+			JobParameters jobParameters = new JobParametersBuilder().addLong("id", 1L, false)
+				.addLong("foo", 2L, false)
+				.toJobParameters();
 			jobLauncherContext.runner.execute(job, jobParameters);
 			assertThat(jobLauncherContext.jobInstances()).hasSize(1);
 			// try to re-run a failed execution with non identifying parameters
@@ -227,8 +233,10 @@ class JobLauncherApplicationRunnerTests {
 		}
 
 		@Bean
-		BatchDataSourceInitializer batchDataSourceInitializer(ResourceLoader resourceLoader) {
-			return new BatchDataSourceInitializer(this.dataSource, resourceLoader, new BatchProperties());
+		DataSourceScriptDatabaseInitializer batchDataSourceInitializer() {
+			DatabaseInitializationSettings settings = new DatabaseInitializationSettings();
+			settings.setSchemaLocations(Arrays.asList("classpath:org/springframework/batch/core/schema-h2.sql"));
+			return new DataSourceScriptDatabaseInitializer(this.dataSource, settings);
 		}
 
 	}

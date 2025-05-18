@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,18 +28,25 @@ import com.couchbase.client.core.env.SecurityConfig;
 import com.couchbase.client.core.env.TimeoutConfig;
 import com.couchbase.client.java.Cluster;
 import com.couchbase.client.java.ClusterOptions;
+import com.couchbase.client.java.codec.JacksonJsonSerializer;
 import com.couchbase.client.java.env.ClusterEnvironment;
 import com.couchbase.client.java.env.ClusterEnvironment.Builder;
+import com.couchbase.client.java.json.JsonValueModule;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnSingleCandidate;
 import org.springframework.boot.autoconfigure.couchbase.CouchbaseProperties.Timeouts;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.util.ResourceUtils;
 
 /**
@@ -50,7 +57,7 @@ import org.springframework.util.ResourceUtils;
  * @author Yulin Qin
  * @since 1.4.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(after = JacksonAutoConfiguration.class)
 @ConditionalOnClass(Cluster.class)
 @ConditionalOnProperty("spring.couchbase.connection-string")
 @EnableConfigurationProperties(CouchbaseProperties.class)
@@ -69,24 +76,29 @@ public class CouchbaseAutoConfiguration {
 	@ConditionalOnMissingBean
 	public Cluster couchbaseCluster(CouchbaseProperties properties, ClusterEnvironment couchbaseClusterEnvironment) {
 		ClusterOptions options = ClusterOptions.clusterOptions(properties.getUsername(), properties.getPassword())
-				.environment(couchbaseClusterEnvironment);
+			.environment(couchbaseClusterEnvironment);
 		return Cluster.connect(properties.getConnectionString(), options);
 	}
 
 	private ClusterEnvironment.Builder initializeEnvironmentBuilder(CouchbaseProperties properties) {
 		ClusterEnvironment.Builder builder = ClusterEnvironment.builder();
 		Timeouts timeouts = properties.getEnv().getTimeouts();
-		builder.timeoutConfig(TimeoutConfig.kvTimeout(timeouts.getKeyValue()).analyticsTimeout(timeouts.getAnalytics())
-				.kvDurableTimeout(timeouts.getKeyValueDurable()).queryTimeout(timeouts.getQuery())
-				.viewTimeout(timeouts.getView()).searchTimeout(timeouts.getSearch())
-				.managementTimeout(timeouts.getManagement()).connectTimeout(timeouts.getConnect())
-				.disconnectTimeout(timeouts.getDisconnect()));
+		builder.timeoutConfig(TimeoutConfig.kvTimeout(timeouts.getKeyValue())
+			.analyticsTimeout(timeouts.getAnalytics())
+			.kvDurableTimeout(timeouts.getKeyValueDurable())
+			.queryTimeout(timeouts.getQuery())
+			.viewTimeout(timeouts.getView())
+			.searchTimeout(timeouts.getSearch())
+			.managementTimeout(timeouts.getManagement())
+			.connectTimeout(timeouts.getConnect())
+			.disconnectTimeout(timeouts.getDisconnect()));
 		CouchbaseProperties.Io io = properties.getEnv().getIo();
-		builder.ioConfig(IoConfig.maxHttpConnections(io.getMaxEndpoints()).numKvConnections(io.getMinEndpoints())
-				.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout()));
+		builder.ioConfig(IoConfig.maxHttpConnections(io.getMaxEndpoints())
+			.numKvConnections(io.getMinEndpoints())
+			.idleHttpConnectionTimeout(io.getIdleHttpConnectionTimeout()));
 		if (properties.getEnv().getSsl().getEnabled()) {
 			builder.securityConfig(SecurityConfig.enableTls(true)
-					.trustManagerFactory(getTrustManagerFactory(properties.getEnv().getSsl())));
+				.trustManagerFactory(getTrustManagerFactory(properties.getEnv().getSsl())));
 		}
 		return builder;
 	}
@@ -95,7 +107,7 @@ public class CouchbaseAutoConfiguration {
 		String resource = ssl.getKeyStore();
 		try {
 			TrustManagerFactory trustManagerFactory = TrustManagerFactory
-					.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+				.getInstance(KeyManagerFactory.getDefaultAlgorithm());
 			KeyStore keyStore = loadKeyStore(resource, ssl.getKeyStorePassword());
 			trustManagerFactory.init(keyStore);
 			return trustManagerFactory;
@@ -112,6 +124,40 @@ public class CouchbaseAutoConfiguration {
 			store.load(stream, (keyStorePassword != null) ? keyStorePassword.toCharArray() : null);
 		}
 		return store;
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	@ConditionalOnClass(ObjectMapper.class)
+	static class JacksonConfiguration {
+
+		@Bean
+		@ConditionalOnSingleCandidate(ObjectMapper.class)
+		ClusterEnvironmentBuilderCustomizer jacksonClusterEnvironmentBuilderCustomizer(ObjectMapper objectMapper) {
+			return new JacksonClusterEnvironmentBuilderCustomizer(
+					objectMapper.copy().registerModule(new JsonValueModule()));
+		}
+
+	}
+
+	private static final class JacksonClusterEnvironmentBuilderCustomizer
+			implements ClusterEnvironmentBuilderCustomizer, Ordered {
+
+		private final ObjectMapper objectMapper;
+
+		private JacksonClusterEnvironmentBuilderCustomizer(ObjectMapper objectMapper) {
+			this.objectMapper = objectMapper;
+		}
+
+		@Override
+		public void customize(Builder builder) {
+			builder.jsonSerializer(JacksonJsonSerializer.create(this.objectMapper));
+		}
+
+		@Override
+		public int getOrder() {
+			return 0;
+		}
+
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package org.springframework.boot.util;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -27,6 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.util.Assert;
@@ -38,16 +40,25 @@ import org.springframework.util.ReflectionUtils;
  *
  * @param <T> the type to instantiate
  * @author Phillip Webb
+ * @author Scott Frederick
  * @since 2.4.0
  */
 public class Instantiator<T> {
 
 	private static final Comparator<Constructor<?>> CONSTRUCTOR_COMPARATOR = Comparator
-			.<Constructor<?>>comparingInt(Constructor::getParameterCount).reversed();
+		.<Constructor<?>>comparingInt(Constructor::getParameterCount)
+		.reversed();
+
+	private static final FailureHandler throwingFailureHandler = (type, implementationName, failure) -> {
+		throw new IllegalArgumentException("Unable to instantiate " + implementationName + " [" + type.getName() + "]",
+				failure);
+	};
 
 	private final Class<?> type;
 
 	private final Map<Class<?>, Function<Class<?>, Object>> availableParameters;
+
+	private final FailureHandler failureHandler;
 
 	/**
 	 * Create a new {@link Instantiator} instance for the given type.
@@ -55,8 +66,22 @@ public class Instantiator<T> {
 	 * @param availableParameters consumer used to register available parameters
 	 */
 	public Instantiator(Class<?> type, Consumer<AvailableParameters> availableParameters) {
+		this(type, availableParameters, throwingFailureHandler);
+	}
+
+	/**
+	 * Create a new {@link Instantiator} instance for the given type.
+	 * @param type the type to instantiate
+	 * @param availableParameters consumer used to register available parameters
+	 * @param failureHandler a {@link FailureHandler} that will be called in case of
+	 * failure when instantiating objects
+	 * @since 2.7.0
+	 */
+	public Instantiator(Class<?> type, Consumer<AvailableParameters> availableParameters,
+			FailureHandler failureHandler) {
 		this.type = type;
 		this.availableParameters = getAvailableParameters(availableParameters);
+		this.failureHandler = failureHandler;
 	}
 
 	private Map<Class<?>, Function<Class<?>, Object>> getAvailableParameters(
@@ -85,22 +110,48 @@ public class Instantiator<T> {
 	 * @return a list of instantiated instances
 	 */
 	public List<T> instantiate(Collection<String> names) {
-		List<T> instances = new ArrayList<>(names.size());
-		for (String name : names) {
-			instances.add(instantiate(name));
-		}
+		return instantiate((ClassLoader) null, names);
+	}
+
+	/**
+	 * Instantiate the given set of class name, injecting constructor arguments as
+	 * necessary.
+	 * @param classLoader the source classloader
+	 * @param names the class names to instantiate
+	 * @return a list of instantiated instances
+	 * @since 2.4.8
+	 */
+	public List<T> instantiate(ClassLoader classLoader, Collection<String> names) {
+		Assert.notNull(names, "Names must not be null");
+		return instantiate(names.stream().map((name) -> TypeSupplier.forName(classLoader, name)));
+	}
+
+	/**
+	 * Instantiate the given set of classes, injecting constructor arguments as necessary.
+	 * @param types the types to instantiate
+	 * @return a list of instantiated instances
+	 * @since 2.4.8
+	 */
+	public List<T> instantiateTypes(Collection<Class<?>> types) {
+		Assert.notNull(types, "Types must not be null");
+		return instantiate(types.stream().map(TypeSupplier::forType));
+	}
+
+	private List<T> instantiate(Stream<TypeSupplier> typeSuppliers) {
+		List<T> instances = typeSuppliers.map(this::instantiate).collect(Collectors.toList());
 		AnnotationAwareOrderComparator.sort(instances);
 		return Collections.unmodifiableList(instances);
 	}
 
-	private T instantiate(String name) {
+	private T instantiate(TypeSupplier typeSupplier) {
 		try {
-			Class<?> type = ClassUtils.forName(name, null);
+			Class<?> type = typeSupplier.get();
 			Assert.isAssignable(this.type, type);
 			return instantiate(type);
 		}
 		catch (Throwable ex) {
-			throw new IllegalArgumentException("Unable to instantiate " + this.type.getName() + " [" + name + "]", ex);
+			this.failureHandler.handleFailure(this.type, typeSupplier.getName(), ex);
+			return null;
 		}
 	}
 
@@ -115,7 +166,7 @@ public class Instantiator<T> {
 				return (T) constructor.newInstance(args);
 			}
 		}
-		throw new IllegalAccessException("Unable to find suitable constructor");
+		throw new IllegalAccessException("Class [" + type.getName() + "] has no suitable constructor");
 	}
 
 	private Object[] getArgs(Class<?>[] parameterTypes) {
@@ -157,6 +208,67 @@ public class Instantiator<T> {
 		 * @param factory the factory used to create the instance that should be injected
 		 */
 		void add(Class<?> type, Function<Class<?>, Object> factory);
+
+	}
+
+	/**
+	 * {@link Supplier} that provides a class type.
+	 */
+	private interface TypeSupplier {
+
+		String getName();
+
+		Class<?> get() throws ClassNotFoundException;
+
+		static TypeSupplier forName(ClassLoader classLoader, String name) {
+			return new TypeSupplier() {
+
+				@Override
+				public String getName() {
+					return name;
+				}
+
+				@Override
+				public Class<?> get() throws ClassNotFoundException {
+					return ClassUtils.forName(name, classLoader);
+				}
+
+			};
+		}
+
+		static TypeSupplier forType(Class<?> type) {
+			return new TypeSupplier() {
+
+				@Override
+				public String getName() {
+					return type.getName();
+				}
+
+				@Override
+				public Class<?> get() throws ClassNotFoundException {
+					return type;
+				}
+
+			};
+		}
+
+	}
+
+	/**
+	 * Strategy for handling a failure that occurs when instantiating a type.
+	 *
+	 * @since 2.7.0
+	 */
+	public interface FailureHandler {
+
+		/**
+		 * Handle the {@code failure} that occurred when instantiating the {@code type}
+		 * that was expected to be of the given {@code typeSupplier}.
+		 * @param type the type
+		 * @param implementationName the name of the implementation type
+		 * @param failure the failure that occurred
+		 */
+		void handleFailure(Class<?> type, String implementationName, Throwable failure);
 
 	}
 

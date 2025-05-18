@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ import org.springframework.boot.loader.tools.JavaExecutable;
 import org.springframework.boot.loader.tools.MainClassFinder;
 
 /**
- * Base class to run a spring application.
+ * Base class to run a Spring Boot application.
  *
  * @author Phillip Webb
  * @author Stephane Nicoll
@@ -86,7 +86,7 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	/**
 	 * Add maven resources to the classpath directly, this allows live in-place editing of
 	 * resources. Duplicate resources are removed from {@code target/classes} to prevent
-	 * them to appear twice if {@code ClassLoader.getResources()} is called. Please
+	 * them from appearing twice if {@code ClassLoader.getResources()} is called. Please
 	 * consider adding {@code spring-boot-devtools} to your project instead as it provides
 	 * this feature and many more.
 	 * @since 1.0.0
@@ -179,16 +179,6 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	 * Additional directories besides the classes directory that should be added to the
 	 * classpath.
 	 * @since 1.0.0
-	 * @deprecated since 2.3.0 for removal in 2.5.0 in favor of {@code directories}
-	 */
-	@Deprecated
-	@Parameter(property = "spring-boot.run.folders")
-	private String[] folders;
-
-	/**
-	 * Additional directories besides the classes directory that should be added to the
-	 * classpath.
-	 * @since 1.0.0
 	 */
 	@Parameter(property = "spring-boot.run.directories")
 	private String[] directories;
@@ -202,12 +192,14 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	private File classesDirectory;
 
 	/**
-	 * Flag to indicate if the run processes should be forked. Disabling forking will
-	 * disable some features such as an agent, custom JVM arguments, devtools or
-	 * specifying the working directory to use.
+	 * Deprecated. Flag to indicate if the run processes should be forked. Disabling
+	 * forking will disable some features such as an agent, custom JVM arguments, devtools
+	 * or specifying the working directory to use.
 	 * @since 1.2.0
+	 * @deprecated since 2.7.0 for removal in 3.0.0 with no replacement
 	 */
 	@Parameter(property = "spring-boot.run.fork", defaultValue = "true")
+	@Deprecated
 	private boolean fork;
 
 	/**
@@ -236,7 +228,9 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	/**
 	 * Specify if the application process should be forked.
 	 * @return {@code true} if the application process should be forked
+	 * @deprecated since 2.7.0 for removal in 3.0.0 with no replacement
 	 */
+	@Deprecated
 	protected boolean isFork() {
 		return this.fork;
 	}
@@ -270,6 +264,7 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	 * Log a warning indicating that fork mode has been explicitly disabled while some
 	 * conditions are present that require to enable it.
 	 */
+	@Deprecated
 	protected void logDisabledFork() {
 		if (getLog().isWarnEnabled()) {
 			if (hasAgent()) {
@@ -314,7 +309,9 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	 * @param arguments the class arguments
 	 * @throws MojoExecutionException in case of MOJO execution errors
 	 * @throws MojoFailureException in case of MOJO failures
+	 * @deprecated since 2.7.0 for removal in 3.0.0 with no replacement
 	 */
+	@Deprecated
 	protected abstract void runWithMavenJvm(String startClassName, String... arguments)
 			throws MojoExecutionException, MojoFailureException;
 
@@ -366,9 +363,10 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	protected RunArguments resolveJvmArguments() {
 		StringBuilder stringBuilder = new StringBuilder();
 		if (this.systemPropertyVariables != null) {
-			stringBuilder.append(this.systemPropertyVariables.entrySet().stream()
-					.map((e) -> SystemPropertyFormatter.format(e.getKey(), e.getValue()))
-					.collect(Collectors.joining(" ")));
+			stringBuilder.append(this.systemPropertyVariables.entrySet()
+				.stream()
+				.map((e) -> SystemPropertyFormatter.format(e.getKey(), e.getValue()))
+				.collect(Collectors.joining(" ")));
 		}
 		if (this.jvmArguments != null) {
 			stringBuilder.append(" ").append(this.jvmArguments);
@@ -462,11 +460,6 @@ public abstract class AbstractRunMojo extends AbstractDependencyFilterMojo {
 	}
 
 	private void addUserDefinedDirectories(List<URL> urls) throws MalformedURLException {
-		if (this.folders != null) {
-			for (String folder : this.folders) {
-				urls.add(new File(folder).toURI().toURL());
-			}
-		}
 		if (this.directories != null) {
 			for (String directory : this.directories) {
 				urls.add(new File(directory).toURI().toURL());

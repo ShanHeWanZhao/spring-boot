@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import org.springframework.http.converter.support.AllEncompassingFormHttpMessage
 
 /**
  * {@link ApplicationListener} to trigger early initialization in a background thread of
- * time consuming tasks.
+ * time-consuming tasks.
  * <p>
  * Set the {@link #IGNORE_BACKGROUNDPREINITIALIZER_PROPERTY_NAME} system property to
  * {@code true} to disable this mechanism and let such initialization happen in the
@@ -100,18 +100,22 @@ public class BackgroundPreinitializer implements ApplicationListener<SpringAppli
 				public void run() {
 					runSafely(new ConversionServiceInitializer());
 					runSafely(new ValidationInitializer());
-					runSafely(new MessageConverterInitializer());
-					runSafely(new JacksonInitializer());
+					if (!runSafely(new MessageConverterInitializer())) {
+						// If the MessageConverterInitializer we still might be able to
+						// initialize Jackson
+						runSafely(new JacksonInitializer());
+					}
 					runSafely(new CharsetInitializer());
 					preinitializationComplete.countDown();
 				}
 
-				public void runSafely(Runnable runnable) {
+				boolean runSafely(Runnable runnable) {
 					try {
 						runnable.run();
+						return true;
 					}
 					catch (Throwable ex) {
-						// Ignore
+						return false;
 					}
 				}
 

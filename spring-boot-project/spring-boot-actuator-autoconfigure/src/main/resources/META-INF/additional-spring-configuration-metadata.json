@@ -1,4 +1,5 @@
 {
+  "groups": [],
   "properties": [
     {
       "name": "info",
@@ -48,6 +49,12 @@
       ]
     },
     {
+      "name": "management.endpoint.health.probes.add-additional-paths",
+      "type": "java.lang.Boolean",
+      "description": "Whether to make the liveness and readiness health groups available on the main server port.",
+      "defaultValue": false
+    },
+    {
       "name": "management.endpoint.health.probes.enabled",
       "type": "java.lang.Boolean",
       "description": "Whether to enable liveness and readiness probes.",
@@ -91,8 +98,7 @@
     {
       "name": "management.endpoints.web.exposure.include",
       "defaultValue": [
-        "health",
-        "info"
+        "health"
       ]
     },
     {
@@ -238,15 +244,6 @@
       "defaultValue": true
     },
     {
-      "name": "management.health.status.order",
-      "defaultValue": [
-        "DOWN",
-        "OUT_OF_SERVICE",
-        "UP",
-        "UNKNOWN"
-      ]
-    },
-    {
       "name": "management.info.build.enabled",
       "type": "java.lang.Boolean",
       "description": "Whether to enable build info.",
@@ -262,7 +259,7 @@
       "name": "management.info.env.enabled",
       "type": "java.lang.Boolean",
       "description": "Whether to enable environment info.",
-      "defaultValue": true
+      "defaultValue": false
     },
     {
       "name": "management.info.git.enabled",
@@ -273,6 +270,18 @@
     {
       "name": "management.info.git.mode",
       "defaultValue": "simple"
+    },
+    {
+      "name": "management.info.java.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to enable Java info.",
+      "defaultValue": false
+    },
+    {
+      "name": "management.info.os.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to enable Operating System info.",
+      "defaultValue": false
     },
     {
       "name": "management.metrics.binders.files.enabled",
@@ -422,12 +431,6 @@
       }
     },
     {
-      "name": "management.metrics.export.jmx.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether exporting of metrics to JMX is enabled.",
-      "defaultValue": true
-    },
-    {
       "name": "management.metrics.export.kairos.num-threads",
       "type": "java.lang.Integer",
       "description": "Number of threads to use with the metrics publishing scheduler.",
@@ -443,12 +446,6 @@
       "deprecation": {
         "level": "error"
       }
-    },
-    {
-      "name": "management.metrics.export.prometheus.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether exporting of metrics to Prometheus is enabled.",
-      "defaultValue": true
     },
     {
       "name": "management.metrics.export.prometheus.histogram-flavor",
@@ -468,10 +465,8 @@
       }
     },
     {
-      "name": "management.metrics.export.simple.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether, in the absence of any other exporter, exporting of metrics to an in-memory backend is enabled.",
-      "defaultValue": true
+      "name": "management.metrics.export.signalfx.published-histogram-type",
+      "defaultValue": "default"
     },
     {
       "name": "management.metrics.export.simple.mode",
@@ -521,6 +516,23 @@
       "deprecation": {
         "level": "error"
       }
+    },
+    {
+      "name": "management.metrics.mongo.command.enabled",
+      "description": "Whether to enable Mongo client command metrics.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.metrics.mongo.connectionpool.enabled",
+      "description": "Whether to enable Mongo connection pool metrics.",
+      "defaultValue": true
+    },
+    {
+      "name": "management.metrics.system.diskspace.paths",
+      "type": "java.util.List<java.io.File>",
+      "defaultValue": [
+        "."
+      ]
     },
     {
       "name": "management.metrics.web.client.request.autotime.enabled",
@@ -581,6 +593,22 @@
       "defaultValue": false
     },
     {
+      "name": "management.server.servlet.context-path",
+      "type": "java.lang.String",
+      "deprecation": {
+        "replacement": "management.server.base-path",
+        "level": "error"
+      }
+    },
+    {
+      "name": "management.server.ssl.certificate",
+      "description": "Path to a PEM-encoded SSL certificate file."
+    },
+    {
+      "name": "management.server.ssl.certificate-private-key",
+      "description": "Path to a PEM-encoded private key file for the SSL certificate."
+    },
+    {
       "name": "management.server.ssl.ciphers",
       "description": "Supported SSL ciphers."
     },
@@ -625,6 +653,14 @@
       "name": "management.server.ssl.protocol",
       "description": "SSL protocol to use.",
       "defaultValue": "TLS"
+    },
+    {
+      "name": "management.server.ssl.trust-certificate",
+      "description": "Path to a PEM-encoded SSL certificate authority file."
+    },
+    {
+      "name": "management.server.ssl.trust-certificate-private-key",
+      "description": "Path to a PEM-encoded private key file for the SSL certificate authority."
     },
     {
       "name": "management.server.ssl.trust-store",

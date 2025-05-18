@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package org.springframework.boot.autoconfigure.flyway;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
+import org.springframework.boot.convert.DurationUnit;
 
 /**
  * Configuration properties for Flyway database migrations.
@@ -33,6 +37,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Dave Syer
  * @author Eddú Meléndez
  * @author Stephane Nicoll
+ * @author Chris Bono
  * @since 1.1.0
  */
 @ConfigurationProperties(prefix = "spring.flyway")
@@ -44,9 +49,9 @@ public class FlywayProperties {
 	private boolean enabled = true;
 
 	/**
-	 * Whether to check that migration scripts location exists.
+	 * Whether to fail if a location of migration scripts doesn't exist.
 	 */
-	private boolean checkLocation = true;
+	private boolean failOnMissingLocations;
 
 	/**
 	 * Locations of migrations scripts. Can contain the special "{vendor}" placeholder to
@@ -63,6 +68,13 @@ public class FlywayProperties {
 	 * Maximum number of retries when attempting to connect to the database.
 	 */
 	private int connectRetries;
+
+	/**
+	 * Maximum time between retries when attempting to connect to the database. If a
+	 * duration suffix is not specified, seconds will be used.
+	 */
+	@DurationUnit(ChronoUnit.SECONDS)
+	private Duration connectRetriesInterval;
 
 	/**
 	 * Maximum number of retries when trying to obtain a lock.
@@ -128,6 +140,11 @@ public class FlywayProperties {
 	private String placeholderSuffix = "}";
 
 	/**
+	 * Separator of default placeholders.
+	 */
+	private String placeholderSeparator;
+
+	/**
 	 * Perform placeholder replacement in migration scripts.
 	 */
 	private boolean placeholderReplacement = true;
@@ -158,12 +175,6 @@ public class FlywayProperties {
 	private String target;
 
 	/**
-	 * JDBC url of the database to migrate. If not set, the primary configured data source
-	 * is used.
-	 */
-	private String url;
-
-	/**
 	 * Login user of the database to migrate.
 	 */
 	private String user;
@@ -172,6 +183,17 @@ public class FlywayProperties {
 	 * Login password of the database to migrate.
 	 */
 	private String password;
+
+	/**
+	 * Fully qualified name of the JDBC driver. Auto-detected based on the URL by default.
+	 */
+	private String driverClassName;
+
+	/**
+	 * JDBC url of the database to migrate. If not set, the primary configured data source
+	 * is used.
+	 */
+	private String url;
 
 	/**
 	 * SQL statements to execute to initialize a connection immediately after obtaining
@@ -203,21 +225,25 @@ public class FlywayProperties {
 	/**
 	 * Whether to ignore missing migrations when reading the schema history table.
 	 */
+	@Deprecated
 	private boolean ignoreMissingMigrations;
 
 	/**
 	 * Whether to ignore ignored migrations when reading the schema history table.
 	 */
+	@Deprecated
 	private boolean ignoreIgnoredMigrations;
 
 	/**
 	 * Whether to ignore pending migrations when reading the schema history table.
 	 */
+	@Deprecated
 	private boolean ignorePendingMigrations;
 
 	/**
 	 * Whether to ignore future migrations when reading the schema history table.
 	 */
+	@Deprecated
 	private boolean ignoreFutureMigrations = true;
 
 	/**
@@ -307,14 +333,20 @@ public class FlywayProperties {
 	private Map<String, String> jdbcProperties = new HashMap<>();
 
 	/**
+	 * Path of the Kerberos config file. Requires Flyway Teams.
+	 */
+	private String kerberosConfigFile;
+
+	/**
 	 * Path of the Oracle Kerberos cache file. Requires Flyway Teams.
 	 */
 	private String oracleKerberosCacheFile;
 
 	/**
-	 * Path of the Oracle Kerberos config file. Requires Flyway Teams.
+	 * Location of the Oracle Wallet, used to sign in to the database automatically.
+	 * Requires Flyway Teams.
 	 */
-	private String oracleKerberosConfigFile;
+	private String oracleWalletLocation;
 
 	/**
 	 * Whether Flyway should output a table with the results of queries when executing
@@ -323,10 +355,42 @@ public class FlywayProperties {
 	private Boolean outputQueryResults;
 
 	/**
+	 * Path to the SQL Server Kerberos login file. Requires Flyway Teams.
+	 */
+	private String sqlServerKerberosLoginFile;
+
+	/**
 	 * Whether Flyway should skip executing the contents of the migrations and only update
 	 * the schema history table. Requires Flyway teams.
 	 */
 	private Boolean skipExecutingMigrations;
+
+	/**
+	 * Ignore migrations that match this comma-separated list of patterns when validating
+	 * migrations. Requires Flyway Teams.
+	 */
+	private List<String> ignoreMigrationPatterns;
+
+	/**
+	 * Whether to attempt to automatically detect SQL migration file encoding. Requires
+	 * Flyway Teams.
+	 */
+	private Boolean detectEncoding;
+
+	/**
+	 * Filename prefix for baseline migrations. Requires Flyway Teams.
+	 */
+	private String baselineMigrationPrefix;
+
+	/**
+	 * Prefix of placeholders in migration scripts.
+	 */
+	private String scriptPlaceholderPrefix;
+
+	/**
+	 * Suffix of placeholders in migration scripts.
+	 */
+	private String scriptPlaceholderSuffix;
 
 	public boolean isEnabled() {
 		return this.enabled;
@@ -336,12 +400,12 @@ public class FlywayProperties {
 		this.enabled = enabled;
 	}
 
-	public boolean isCheckLocation() {
-		return this.checkLocation;
+	public boolean isFailOnMissingLocations() {
+		return this.failOnMissingLocations;
 	}
 
-	public void setCheckLocation(boolean checkLocation) {
-		this.checkLocation = checkLocation;
+	public void setFailOnMissingLocations(boolean failOnMissingLocations) {
+		this.failOnMissingLocations = failOnMissingLocations;
 	}
 
 	public List<String> getLocations() {
@@ -366,6 +430,14 @@ public class FlywayProperties {
 
 	public void setConnectRetries(int connectRetries) {
 		this.connectRetries = connectRetries;
+	}
+
+	public Duration getConnectRetriesInterval() {
+		return this.connectRetriesInterval;
+	}
+
+	public void setConnectRetriesInterval(Duration connectRetriesInterval) {
+		this.connectRetriesInterval = connectRetriesInterval;
 	}
 
 	public Integer getLockRetryCount() {
@@ -464,6 +536,14 @@ public class FlywayProperties {
 		this.placeholderSuffix = placeholderSuffix;
 	}
 
+	public String getPlaceholderSeparator() {
+		return this.placeholderSeparator;
+	}
+
+	public void setPlaceholderSeparator(String placeholderSeparator) {
+		this.placeholderSeparator = placeholderSeparator;
+	}
+
 	public boolean isPlaceholderReplacement() {
 		return this.placeholderReplacement;
 	}
@@ -512,18 +592,6 @@ public class FlywayProperties {
 		this.target = target;
 	}
 
-	public boolean isCreateDataSource() {
-		return this.url != null || this.user != null;
-	}
-
-	public String getUrl() {
-		return this.url;
-	}
-
-	public void setUrl(String url) {
-		this.url = url;
-	}
-
 	public String getUser() {
 		return this.user;
 	}
@@ -533,11 +601,27 @@ public class FlywayProperties {
 	}
 
 	public String getPassword() {
-		return (this.password != null) ? this.password : "";
+		return this.password;
 	}
 
 	public void setPassword(String password) {
 		this.password = password;
+	}
+
+	public String getDriverClassName() {
+		return this.driverClassName;
+	}
+
+	public void setDriverClassName(String driverClassName) {
+		this.driverClassName = driverClassName;
+	}
+
+	public String getUrl() {
+		return this.url;
+	}
+
+	public void setUrl(String url) {
+		this.url = url;
 	}
 
 	public List<String> getInitSqls() {
@@ -580,34 +664,46 @@ public class FlywayProperties {
 		this.group = group;
 	}
 
+	@Deprecated
+	@DeprecatedConfigurationProperty(replacement = "spring.flyway.ignore-migration-patterns")
 	public boolean isIgnoreMissingMigrations() {
 		return this.ignoreMissingMigrations;
 	}
 
+	@Deprecated
 	public void setIgnoreMissingMigrations(boolean ignoreMissingMigrations) {
 		this.ignoreMissingMigrations = ignoreMissingMigrations;
 	}
 
+	@Deprecated
+	@DeprecatedConfigurationProperty(replacement = "spring.flyway.ignore-migration-patterns")
 	public boolean isIgnoreIgnoredMigrations() {
 		return this.ignoreIgnoredMigrations;
 	}
 
+	@Deprecated
 	public void setIgnoreIgnoredMigrations(boolean ignoreIgnoredMigrations) {
 		this.ignoreIgnoredMigrations = ignoreIgnoredMigrations;
 	}
 
+	@Deprecated
+	@DeprecatedConfigurationProperty(replacement = "spring.flyway.ignore-migration-patterns")
 	public boolean isIgnorePendingMigrations() {
 		return this.ignorePendingMigrations;
 	}
 
+	@Deprecated
 	public void setIgnorePendingMigrations(boolean ignorePendingMigrations) {
 		this.ignorePendingMigrations = ignorePendingMigrations;
 	}
 
+	@Deprecated
+	@DeprecatedConfigurationProperty(replacement = "spring.flyway.ignore-migration-patterns")
 	public boolean isIgnoreFutureMigrations() {
 		return this.ignoreFutureMigrations;
 	}
 
+	@Deprecated
 	public void setIgnoreFutureMigrations(boolean ignoreFutureMigrations) {
 		this.ignoreFutureMigrations = ignoreFutureMigrations;
 	}
@@ -708,6 +804,14 @@ public class FlywayProperties {
 		this.oracleSqlplusWarn = oracleSqlplusWarn;
 	}
 
+	public String getOracleWalletLocation() {
+		return this.oracleWalletLocation;
+	}
+
+	public void setOracleWalletLocation(String oracleWalletLocation) {
+		this.oracleWalletLocation = oracleWalletLocation;
+	}
+
 	public Boolean getStream() {
 		return this.stream;
 	}
@@ -740,6 +844,14 @@ public class FlywayProperties {
 		this.jdbcProperties = jdbcProperties;
 	}
 
+	public String getKerberosConfigFile() {
+		return this.kerberosConfigFile;
+	}
+
+	public void setKerberosConfigFile(String kerberosConfigFile) {
+		this.kerberosConfigFile = kerberosConfigFile;
+	}
+
 	public String getOracleKerberosCacheFile() {
 		return this.oracleKerberosCacheFile;
 	}
@@ -748,12 +860,15 @@ public class FlywayProperties {
 		this.oracleKerberosCacheFile = oracleKerberosCacheFile;
 	}
 
+	@DeprecatedConfigurationProperty(replacement = "spring.flyway.kerberos-config-file")
+	@Deprecated
 	public String getOracleKerberosConfigFile() {
-		return this.oracleKerberosConfigFile;
+		return getKerberosConfigFile();
 	}
 
+	@Deprecated
 	public void setOracleKerberosConfigFile(String oracleKerberosConfigFile) {
-		this.oracleKerberosConfigFile = oracleKerberosConfigFile;
+		setKerberosConfigFile(oracleKerberosConfigFile);
 	}
 
 	public Boolean getOutputQueryResults() {
@@ -764,12 +879,60 @@ public class FlywayProperties {
 		this.outputQueryResults = outputQueryResults;
 	}
 
+	public String getSqlServerKerberosLoginFile() {
+		return this.sqlServerKerberosLoginFile;
+	}
+
+	public void setSqlServerKerberosLoginFile(String sqlServerKerberosLoginFile) {
+		this.sqlServerKerberosLoginFile = sqlServerKerberosLoginFile;
+	}
+
 	public Boolean getSkipExecutingMigrations() {
 		return this.skipExecutingMigrations;
 	}
 
 	public void setSkipExecutingMigrations(Boolean skipExecutingMigrations) {
 		this.skipExecutingMigrations = skipExecutingMigrations;
+	}
+
+	public List<String> getIgnoreMigrationPatterns() {
+		return this.ignoreMigrationPatterns;
+	}
+
+	public void setIgnoreMigrationPatterns(List<String> ignoreMigrationPatterns) {
+		this.ignoreMigrationPatterns = ignoreMigrationPatterns;
+	}
+
+	public Boolean getDetectEncoding() {
+		return this.detectEncoding;
+	}
+
+	public void setDetectEncoding(final Boolean detectEncoding) {
+		this.detectEncoding = detectEncoding;
+	}
+
+	public String getBaselineMigrationPrefix() {
+		return this.baselineMigrationPrefix;
+	}
+
+	public void setBaselineMigrationPrefix(String baselineMigrationPrefix) {
+		this.baselineMigrationPrefix = baselineMigrationPrefix;
+	}
+
+	public String getScriptPlaceholderPrefix() {
+		return this.scriptPlaceholderPrefix;
+	}
+
+	public void setScriptPlaceholderPrefix(String scriptPlaceholderPrefix) {
+		this.scriptPlaceholderPrefix = scriptPlaceholderPrefix;
+	}
+
+	public String getScriptPlaceholderSuffix() {
+		return this.scriptPlaceholderSuffix;
+	}
+
+	public void setScriptPlaceholderSuffix(String scriptPlaceholderSuffix) {
+		this.scriptPlaceholderSuffix = scriptPlaceholderSuffix;
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.boot.autoconfigure.session;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,8 +25,7 @@ import java.util.Locale;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
-import org.springframework.boot.autoconfigure.AutoConfigureBefore;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -42,8 +42,12 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.boot.autoconfigure.web.reactive.HttpHandlerAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.reactive.WebFluxAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.reactive.WebFluxProperties;
+import org.springframework.boot.autoconfigure.web.reactive.WebSessionIdResolverAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.PropertyMapper;
+import org.springframework.boot.web.server.Cookie.SameSite;
 import org.springframework.boot.web.servlet.server.Session.Cookie;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -70,16 +74,18 @@ import org.springframework.session.web.http.HttpSessionIdResolver;
  * @author Eddú Meléndez
  * @author Stephane Nicoll
  * @author Vedran Pavic
+ * @author Weix Sun
  * @since 1.4.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(
+		after = { DataSourceAutoConfiguration.class, HazelcastAutoConfiguration.class,
+				JdbcTemplateAutoConfiguration.class, MongoDataAutoConfiguration.class,
+				MongoReactiveDataAutoConfiguration.class, RedisAutoConfiguration.class,
+				RedisReactiveAutoConfiguration.class, WebSessionIdResolverAutoConfiguration.class },
+		before = { HttpHandlerAutoConfiguration.class, WebFluxAutoConfiguration.class })
 @ConditionalOnClass(Session.class)
 @ConditionalOnWebApplication
-@EnableConfigurationProperties({ ServerProperties.class, SessionProperties.class })
-@AutoConfigureAfter({ DataSourceAutoConfiguration.class, HazelcastAutoConfiguration.class,
-		JdbcTemplateAutoConfiguration.class, MongoDataAutoConfiguration.class, MongoReactiveDataAutoConfiguration.class,
-		RedisAutoConfiguration.class, RedisReactiveAutoConfiguration.class })
-@AutoConfigureBefore(HttpHandlerAutoConfiguration.class)
+@EnableConfigurationProperties({ ServerProperties.class, SessionProperties.class, WebFluxProperties.class })
 public class SessionAutoConfiguration {
 
 	@Configuration(proxyBeanMethods = false)
@@ -99,7 +105,8 @@ public class SessionAutoConfiguration {
 			map.from(cookie::getPath).to(cookieSerializer::setCookiePath);
 			map.from(cookie::getHttpOnly).to(cookieSerializer::setUseHttpOnlyCookie);
 			map.from(cookie::getSecure).to(cookieSerializer::setUseSecureCookie);
-			map.from(cookie::getMaxAge).to((maxAge) -> cookieSerializer.setCookieMaxAge((int) maxAge.getSeconds()));
+			map.from(cookie::getMaxAge).asInt(Duration::getSeconds).to(cookieSerializer::setCookieMaxAge);
+			map.from(cookie::getSameSite).as(SameSite::attributeValue).to(cookieSerializer::setSameSite);
 			cookieSerializerCustomizers.orderedStream().forEach((customizer) -> customizer.customize(cookieSerializer));
 			return cookieSerializer;
 		}
@@ -111,7 +118,7 @@ public class SessionAutoConfiguration {
 			@Bean
 			DefaultCookieSerializerCustomizer rememberMeServicesCookieSerializerCustomizer() {
 				return (cookieSerializer) -> cookieSerializer
-						.setRememberMeRequestAttribute(SpringSessionRememberMeServices.REMEMBER_ME_LOGIN_ATTR);
+					.setRememberMeRequestAttribute(SpringSessionRememberMeServices.REMEMBER_ME_LOGIN_ATTR);
 			}
 
 		}
@@ -173,8 +180,8 @@ public class SessionAutoConfiguration {
 
 		protected final String[] selectImports(WebApplicationType webApplicationType) {
 			return Arrays.stream(StoreType.values())
-					.map((type) -> SessionStoreMappings.getConfigurationClass(webApplicationType, type))
-					.toArray(String[]::new);
+				.map((type) -> SessionStoreMappings.getConfigurationClass(webApplicationType, type))
+				.toArray(String[]::new);
 		}
 
 	}
@@ -238,10 +245,7 @@ public class SessionAutoConfiguration {
 
 		private void addCandidateIfAvailable(List<Class<?>> candidates, String type) {
 			try {
-				Class<?> candidate = Class.forName(type, false, this.classLoader);
-				if (candidate != null) {
-					candidates.add(candidate);
-				}
+				candidates.add(Class.forName(type, false, this.classLoader));
 			}
 			catch (Throwable ex) {
 				// Ignore

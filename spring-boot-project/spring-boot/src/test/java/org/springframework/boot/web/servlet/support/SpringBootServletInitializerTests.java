@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
+import org.springframework.boot.context.logging.LoggingApplicationListener;
 import org.springframework.boot.testsupport.system.CapturedOutput;
 import org.springframework.boot.testsupport.system.OutputCaptureExtension;
 import org.springframework.boot.web.embedded.undertow.UndertowServletWebServerFactory;
@@ -56,8 +57,8 @@ import org.springframework.web.context.support.StandardServletEnvironment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link SpringBootServletInitializer}.
@@ -80,9 +81,8 @@ class SpringBootServletInitializerTests {
 	@Test
 	void failsWithoutConfigure() {
 		assertThatIllegalStateException()
-				.isThrownBy(
-						() -> new MockSpringBootServletInitializer().createRootApplicationContext(this.servletContext))
-				.withMessageContaining("No SpringApplication sources have been defined");
+			.isThrownBy(() -> new MockSpringBootServletInitializer().createRootApplicationContext(this.servletContext))
+			.withMessageContaining("No SpringApplication sources have been defined");
 	}
 
 	@Test
@@ -113,8 +113,10 @@ class SpringBootServletInitializerTests {
 	}
 
 	@Test
-	void shutdownHookIsNotRegistered() {
-		new WithConfigurationAnnotation().createRootApplicationContext(this.servletContext);
+	void shutdownHooksAreNotRegistered() throws ServletException {
+		new WithConfigurationAnnotation().onStartup(this.servletContext);
+		assertThat(this.servletContext.getAttribute(LoggingApplicationListener.REGISTER_SHUTDOWN_HOOK_PROPERTY))
+			.isEqualTo(false);
 		assertThat(this.application).hasFieldOrPropertyWithValue("registerShutdownHook", false);
 	}
 
@@ -122,7 +124,7 @@ class SpringBootServletInitializerTests {
 	void errorPageFilterRegistrationCanBeDisabled() {
 		WebServer webServer = new UndertowServletWebServerFactory(0).getWebServer((servletContext) -> {
 			try (AbstractApplicationContext context = (AbstractApplicationContext) new WithErrorPageFilterNotRegistered()
-					.createRootApplicationContext(servletContext)) {
+				.createRootApplicationContext(servletContext)) {
 				assertThat(context.getBeansOfType(ErrorPageFilter.class)).hasSize(0);
 			}
 		});
@@ -139,9 +141,9 @@ class SpringBootServletInitializerTests {
 	void errorPageFilterIsRegisteredWithNearHighestPrecedence() {
 		WebServer webServer = new UndertowServletWebServerFactory(0).getWebServer((servletContext) -> {
 			try (AbstractApplicationContext context = (AbstractApplicationContext) new WithErrorPageFilter()
-					.createRootApplicationContext(servletContext)) {
+				.createRootApplicationContext(servletContext)) {
 				Map<String, FilterRegistrationBean> registrations = context
-						.getBeansOfType(FilterRegistrationBean.class);
+					.getBeansOfType(FilterRegistrationBean.class);
 				assertThat(registrations).hasSize(1);
 				FilterRegistrationBean errorPageFilterRegistration = registrations.get("errorPageFilterRegistration");
 				assertThat(errorPageFilterRegistration.getOrder()).isEqualTo(Ordered.HIGHEST_PRECEDENCE + 1);
@@ -160,9 +162,9 @@ class SpringBootServletInitializerTests {
 	void errorPageFilterIsRegisteredForRequestAndAsyncDispatch() {
 		WebServer webServer = new UndertowServletWebServerFactory(0).getWebServer((servletContext) -> {
 			try (AbstractApplicationContext context = (AbstractApplicationContext) new WithErrorPageFilter()
-					.createRootApplicationContext(servletContext)) {
+				.createRootApplicationContext(servletContext)) {
 				Map<String, FilterRegistrationBean> registrations = context
-						.getBeansOfType(FilterRegistrationBean.class);
+					.getBeansOfType(FilterRegistrationBean.class);
 				assertThat(registrations).hasSize(1);
 				FilterRegistrationBean errorPageFilterRegistration = registrations.get("errorPageFilterRegistration");
 				assertThat(errorPageFilterRegistration).hasFieldOrPropertyWithValue("dispatcherTypes",
@@ -188,11 +190,11 @@ class SpringBootServletInitializerTests {
 	void servletContextPropertySourceIsAvailablePriorToRefresh() {
 		ServletContext servletContext = mock(ServletContext.class);
 		given(servletContext.getInitParameterNames())
-				.willReturn(Collections.enumeration(Collections.singletonList("spring.profiles.active")));
+			.willReturn(Collections.enumeration(Collections.singletonList("spring.profiles.active")));
 		given(servletContext.getInitParameter("spring.profiles.active")).willReturn("from-servlet-context");
 		given(servletContext.getAttributeNames()).willReturn(Collections.emptyEnumeration());
 		try (ConfigurableApplicationContext context = (ConfigurableApplicationContext) new PropertySourceVerifyingSpringBootServletInitializer()
-				.createRootApplicationContext(servletContext)) {
+			.createRootApplicationContext(servletContext)) {
 			assertThat(context.getEnvironment().getActiveProfiles()).containsExactly("from-servlet-context");
 		}
 	}
@@ -217,7 +219,7 @@ class SpringBootServletInitializerTests {
 
 		}.onStartup(servletContext);
 		ArgumentCaptor<ServletContextListener> captor = ArgumentCaptor.forClass(ServletContextListener.class);
-		verify(servletContext).addListener(captor.capture());
+		then(servletContext).should().addListener(captor.capture());
 		captor.getValue().contextDestroyed(new ServletContextEvent(servletContext));
 		assertThat(driversDeregistered).isTrue();
 	}
@@ -322,8 +324,9 @@ class SpringBootServletInitializerTests {
 
 		@Override
 		public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {
-			PropertySource<?> propertySource = event.getEnvironment().getPropertySources()
-					.get(StandardServletEnvironment.SERVLET_CONTEXT_PROPERTY_SOURCE_NAME);
+			PropertySource<?> propertySource = event.getEnvironment()
+				.getPropertySources()
+				.get(StandardServletEnvironment.SERVLET_CONTEXT_PROPERTY_SOURCE_NAME);
 			assertThat(propertySource.getProperty("spring.profiles.active")).isEqualTo("from-servlet-context");
 		}
 

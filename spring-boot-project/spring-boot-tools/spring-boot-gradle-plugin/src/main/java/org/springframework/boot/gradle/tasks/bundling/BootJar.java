@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.function.Function;
 
 import org.gradle.api.Action;
 import org.gradle.api.Project;
-import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.ResolvableDependencies;
 import org.gradle.api.file.CopySpec;
 import org.gradle.api.file.FileCollection;
@@ -35,6 +34,7 @@ import org.gradle.api.specs.Spec;
 import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.bundling.Jar;
+import org.gradle.work.DisableCachingByDefault;
 
 /**
  * A custom {@link Jar} task that produces a Spring Boot executable jar.
@@ -45,6 +45,7 @@ import org.gradle.api.tasks.bundling.Jar;
  * @author Phillip Webb
  * @since 2.0.0
  */
+@DisableCachingByDefault(because = "Not worth caching")
 public class BootJar extends Jar implements BootArchive {
 
 	private static final String LAUNCHER = "org.springframework.boot.loader.JarLauncher";
@@ -92,8 +93,8 @@ public class BootJar extends Jar implements BootArchive {
 	private void configureBootInfSpec(CopySpec bootInfSpec) {
 		bootInfSpec.into("classes", fromCallTo(this::classpathDirectories));
 		bootInfSpec.into("lib", fromCallTo(this::classpathFiles)).eachFile(this.support::excludeNonZipFiles);
-		bootInfSpec.filesMatching("module-info.class",
-				(details) -> details.setRelativePath(details.getRelativeSourcePath()));
+		this.support.moveModuleInfoToRoot(bootInfSpec);
+		moveMetaInfToRoot(bootInfSpec);
 	}
 
 	private Iterable<File> classpathDirectories() {
@@ -106,6 +107,16 @@ public class BootJar extends Jar implements BootArchive {
 
 	private Iterable<File> classpathEntries(Spec<File> filter) {
 		return (this.classpath != null) ? this.classpath.filter(filter) : Collections.emptyList();
+	}
+
+	private void moveMetaInfToRoot(CopySpec spec) {
+		spec.eachFile((file) -> {
+			String path = file.getRelativeSourcePath().getPathString();
+			if (path.startsWith("META-INF/") && !path.equals("META-INF/aop.xml") && !path.endsWith(".kotlin_module")
+					&& !path.startsWith("META-INF/services/")) {
+				this.support.moveToRoot(file);
+			}
+		});
 	}
 
 	@Override
@@ -129,34 +140,9 @@ public class BootJar extends Jar implements BootArchive {
 		return this.support.createCopyAction(this);
 	}
 
-	/**
-	 * Returns the {@link Configuration Configurations} of the project associated with
-	 * this task.
-	 * @return the configurations
-	 * @deprecated since 2.3.5 for removal in 2.5 in favor of
-	 * {@link Project#getConfigurations}
-	 */
-	@Internal
-	@Deprecated
-	protected Iterable<Configuration> getConfigurations() {
-		return getProject().getConfigurations();
-	}
-
 	@Override
 	public Property<String> getMainClass() {
 		return this.mainClass;
-	}
-
-	@Override
-	@Deprecated
-	public String getMainClassName() {
-		return this.mainClass.getOrNull();
-	}
-
-	@Override
-	@Deprecated
-	public void setMainClassName(String mainClassName) {
-		this.mainClass.set(mainClassName);
 	}
 
 	@Override
@@ -195,15 +181,6 @@ public class BootJar extends Jar implements BootArchive {
 	}
 
 	/**
-	 * Configures the jar to be layered using the default layering.
-	 * @since 2.3.0
-	 * @deprecated since 2.4.0 for removal in 2.6.0 as layering as now enabled by default.
-	 */
-	@Deprecated
-	public void layered() {
-	}
-
-	/**
 	 * Configures the jar's layering using the given {@code action}.
 	 * @param action the action to apply
 	 * @since 2.3.0
@@ -232,18 +209,6 @@ public class BootJar extends Jar implements BootArchive {
 	@Override
 	public void setClasspath(FileCollection classpath) {
 		this.classpath = getProject().files(classpath);
-	}
-
-	@Override
-	@Deprecated
-	public boolean isExcludeDevtools() {
-		return this.support.isExcludeDevtools();
-	}
-
-	@Override
-	@Deprecated
-	public void setExcludeDevtools(boolean excludeDevtools) {
-		this.support.setExcludeDevtools(excludeDevtools);
 	}
 
 	/**

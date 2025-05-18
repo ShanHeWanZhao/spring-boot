@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import ch.qos.logback.core.util.FileSize;
 import ch.qos.logback.core.util.OptionHelper;
 
 import org.springframework.boot.logging.LogFile;
-import org.springframework.boot.logging.LoggingInitializationContext;
 
 /**
  * Default logback configuration used by Spring Boot. Uses {@link LogbackConfigurator} to
@@ -46,7 +45,7 @@ class DefaultLogbackConfiguration {
 
 	private final LogFile logFile;
 
-	DefaultLogbackConfiguration(LoggingInitializationContext initializationContext, LogFile logFile) {
+	DefaultLogbackConfiguration(LogFile logFile) {
 		this.logFile = logFile;
 	}
 
@@ -68,15 +67,20 @@ class DefaultLogbackConfiguration {
 		config.conversionRule("clr", ColorConverter.class);
 		config.conversionRule("wex", WhitespaceThrowableProxyConverter.class);
 		config.conversionRule("wEx", ExtendedWhitespaceThrowableProxyConverter.class);
-		config.getContext().putProperty("CONSOLE_LOG_PATTERN", resolve(config, "${CONSOLE_LOG_PATTERN:-"
-				+ "%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) "
-				+ "%clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} "
-				+ "%clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"));
-		config.getContext().putProperty("CONSOLE_LOG_CHARSET", resolve(config, "${CONSOLE_LOG_CHARSET:-default}"));
-		config.getContext().putProperty("FILE_LOG_PATTERN", resolve(config, "${FILE_LOG_PATTERN:-"
-				+ "%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:- } --- [%t] "
-				+ "%-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"));
-		config.getContext().putProperty("FILE_LOG_CHARSET", resolve(config, "${FILE_LOG_CHARSET:-default}"));
+		config.getContext()
+			.putProperty("CONSOLE_LOG_PATTERN", resolve(config, "${CONSOLE_LOG_PATTERN:-"
+					+ "%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) "
+					+ "%clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} "
+					+ "%clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"));
+		String defaultCharset = Charset.defaultCharset().name();
+		config.getContext()
+			.putProperty("CONSOLE_LOG_CHARSET", resolve(config, "${CONSOLE_LOG_CHARSET:-" + defaultCharset + "}"));
+		config.getContext()
+			.putProperty("FILE_LOG_PATTERN", resolve(config, "${FILE_LOG_PATTERN:-"
+					+ "%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:- } --- [%t] "
+					+ "%-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"));
+		config.getContext()
+			.putProperty("FILE_LOG_CHARSET", resolve(config, "${FILE_LOG_CHARSET:-" + defaultCharset + "}"));
 		config.logger("org.apache.catalina.startup.DigesterFactory", Level.ERROR);
 		config.logger("org.apache.catalina.util.LifecycleBase", Level.ERROR);
 		config.logger("org.apache.coyote.http11.Http11NioProtocol", Level.WARN);
@@ -106,19 +110,18 @@ class DefaultLogbackConfiguration {
 		appender.setEncoder(encoder);
 		config.start(encoder);
 		appender.setFile(logFile);
-		setRollingPolicy(appender, config, logFile);
+		setRollingPolicy(appender, config);
 		config.appender("FILE", appender);
 		return appender;
 	}
 
-	private void setRollingPolicy(RollingFileAppender<ILoggingEvent> appender, LogbackConfigurator config,
-			String logFile) {
+	private void setRollingPolicy(RollingFileAppender<ILoggingEvent> appender, LogbackConfigurator config) {
 		SizeAndTimeBasedRollingPolicy<ILoggingEvent> rollingPolicy = new SizeAndTimeBasedRollingPolicy<>();
 		rollingPolicy.setContext(config.getContext());
 		rollingPolicy.setFileNamePattern(
 				resolve(config, "${LOGBACK_ROLLINGPOLICY_FILE_NAME_PATTERN:-${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz}"));
-		rollingPolicy.setCleanHistoryOnStart(
-				resolveBoolean(config, "${LOGBACK_ROLLINGPOLICY_CLEAN_HISTORY_ON_START:-false}"));
+		rollingPolicy
+			.setCleanHistoryOnStart(resolveBoolean(config, "${LOGBACK_ROLLINGPOLICY_CLEAN_HISTORY_ON_START:-false}"));
 		rollingPolicy.setMaxFileSize(resolveFileSize(config, "${LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:-10MB}"));
 		rollingPolicy.setTotalSizeCap(resolveFileSize(config, "${LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP:-0}"));
 		rollingPolicy.setMaxHistory(resolveInt(config, "${LOGBACK_ROLLINGPOLICY_MAX_HISTORY:-7}"));

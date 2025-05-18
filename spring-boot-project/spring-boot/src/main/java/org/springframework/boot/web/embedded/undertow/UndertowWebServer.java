@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,21 +83,7 @@ public class UndertowWebServer implements WebServer {
 	 * @param autoStart if the server should be started
 	 */
 	public UndertowWebServer(Undertow.Builder builder, boolean autoStart) {
-		this(builder, autoStart, null);
-	}
-
-	/**
-	 * Create a new {@link UndertowWebServer} instance.
-	 * @param builder the builder
-	 * @param autoStart if the server should be started
-	 * @param closeable called when the server is stopped
-	 * @since 2.0.4
-	 * @deprecated since 2.3.0 for removal in 2.5.0 in favor of
-	 * {@link #UndertowWebServer(io.undertow.Undertow.Builder, Iterable, boolean)}
-	 */
-	@Deprecated
-	public UndertowWebServer(Undertow.Builder builder, boolean autoStart, Closeable closeable) {
-		this(builder, Collections.singleton(new CloseableHttpHandlerFactory(closeable)), autoStart);
+		this(builder, Collections.singleton(new CloseableHttpHandlerFactory(null)), autoStart);
 	}
 
 	/**
@@ -309,7 +295,7 @@ public class UndertowWebServer implements WebServer {
 		logger.info("Commencing graceful shutdown. Waiting for active requests to complete");
 		this.gracefulShutdownCallback.set(callback);
 		this.gracefulShutdown.shutdown();
-		this.gracefulShutdown.addShutdownListener((success) -> notifyGracefulCallback(success));
+		this.gracefulShutdown.addShutdownListener(this::notifyGracefulCallback);
 	}
 
 	private void notifyGracefulCallback(boolean success) {

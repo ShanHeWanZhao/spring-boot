@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,27 @@ class DataSourcePropertiesTests {
 		properties.setBeanClassLoader(new FilteredClassLoader("org.h2", "org.apache.derby", "org.hsqldb"));
 		properties.afterPropertiesSet();
 		assertThatExceptionOfType(DataSourceProperties.DataSourceBeanCreationException.class)
-				.isThrownBy(properties::determineUrl).withMessageContaining("Failed to determine suitable jdbc url");
+			.isThrownBy(properties::determineUrl)
+			.withMessageContaining("Failed to determine suitable jdbc url");
+	}
+
+	@Test
+	void determineUrlWithSpecificEmbeddedConnection() throws Exception {
+		DataSourceProperties properties = new DataSourceProperties();
+		properties.setGenerateUniqueName(false);
+		properties.setEmbeddedDatabaseConnection(EmbeddedDatabaseConnection.HSQLDB);
+		properties.afterPropertiesSet();
+		assertThat(properties.determineUrl()).isEqualTo(EmbeddedDatabaseConnection.HSQLDB.getUrl("testdb"));
+	}
+
+	@Test
+	void whenEmbeddedConnectionIsNoneAndNoUrlIsConfiguredThenDetermineUrlThrows() {
+		DataSourceProperties properties = new DataSourceProperties();
+		properties.setGenerateUniqueName(false);
+		properties.setEmbeddedDatabaseConnection(EmbeddedDatabaseConnection.NONE);
+		assertThatExceptionOfType(DataSourceProperties.DataSourceBeanCreationException.class)
+			.isThrownBy(properties::determineUrl)
+			.withMessageContaining("Failed to determine suitable jdbc url");
 	}
 
 	@Test
@@ -158,24 +178,6 @@ class DataSourcePropertiesTests {
 		properties.afterPropertiesSet();
 		assertThat(properties.getPassword()).isNull();
 		assertThat(properties.determinePassword()).isNull();
-	}
-
-	@Test
-	void determineCredentialsForSchemaScripts() {
-		DataSourceProperties properties = new DataSourceProperties();
-		properties.setSchemaUsername("foo");
-		properties.setSchemaPassword("bar");
-		assertThat(properties.getSchemaUsername()).isEqualTo("foo");
-		assertThat(properties.getSchemaPassword()).isEqualTo("bar");
-	}
-
-	@Test
-	void determineCredentialsForDataScripts() {
-		DataSourceProperties properties = new DataSourceProperties();
-		properties.setDataUsername("foo");
-		properties.setDataPassword("bar");
-		assertThat(properties.getDataUsername()).isEqualTo("foo");
-		assertThat(properties.getDataPassword()).isEqualTo("bar");
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,10 +35,12 @@ final class TldPatterns {
 		Set<String> skipPatterns = new LinkedHashSet<>();
 		skipPatterns.add("annotations-api.jar");
 		skipPatterns.add("ant-junit*.jar");
-		skipPatterns.add("ant-launcher.jar");
-		skipPatterns.add("ant.jar");
+		skipPatterns.add("ant-launcher*.jar");
+		skipPatterns.add("ant*.jar");
 		skipPatterns.add("asm-*.jar");
 		skipPatterns.add("aspectj*.jar");
+		skipPatterns.add("bcel*.jar");
+		skipPatterns.add("biz.aQute.bnd*.jar");
 		skipPatterns.add("bootstrap.jar");
 		skipPatterns.add("catalina-ant.jar");
 		skipPatterns.add("catalina-ha.jar");
@@ -51,6 +53,7 @@ final class TldPatterns {
 		skipPatterns.add("commons-beanutils*.jar");
 		skipPatterns.add("commons-codec*.jar");
 		skipPatterns.add("commons-collections*.jar");
+		skipPatterns.add("commons-compress*.jar");
 		skipPatterns.add("commons-daemon.jar");
 		skipPatterns.add("commons-dbcp*.jar");
 		skipPatterns.add("commons-digester*.jar");
@@ -61,12 +64,14 @@ final class TldPatterns {
 		skipPatterns.add("commons-logging*.jar");
 		skipPatterns.add("commons-math*.jar");
 		skipPatterns.add("commons-pool*.jar");
+		skipPatterns.add("derby-*.jar");
 		skipPatterns.add("dom4j-*.jar");
 		skipPatterns.add("easymock-*.jar");
 		skipPatterns.add("ecj-*.jar");
 		skipPatterns.add("el-api.jar");
 		skipPatterns.add("geronimo-spec-jaxrpc*.jar");
 		skipPatterns.add("h2*.jar");
+		skipPatterns.add("ha-api-*.jar");
 		skipPatterns.add("hamcrest-*.jar");
 		skipPatterns.add("hibernate*.jar");
 		skipPatterns.add("httpclient*.jar");
@@ -76,6 +81,7 @@ final class TldPatterns {
 		skipPatterns.add("jaspic-api.jar");
 		skipPatterns.add("jaxb-*.jar");
 		skipPatterns.add("jaxen-*.jar");
+		skipPatterns.add("jaxws-rt-*.jar");
 		skipPatterns.add("jdom-*.jar");
 		skipPatterns.add("jetty-*.jar");
 		skipPatterns.add("jmx-tools.jar");
@@ -89,6 +95,8 @@ final class TldPatterns {
 		skipPatterns.add("mail*.jar");
 		skipPatterns.add("objenesis-*.jar");
 		skipPatterns.add("oraclepki.jar");
+		skipPatterns.add("org.hamcrest.core_*.jar");
+		skipPatterns.add("org.junit_*.jar");
 		skipPatterns.add("oro-*.jar");
 		skipPatterns.add("servlet-api-*.jar");
 		skipPatterns.add("servlet-api.jar");
@@ -107,6 +115,7 @@ final class TldPatterns {
 		skipPatterns.add("tomcat-util.jar");
 		skipPatterns.add("tomcat-websocket.jar");
 		skipPatterns.add("tools.jar");
+		skipPatterns.add("unboundid-ldapsdk-*.jar");
 		skipPatterns.add("websocket-api.jar");
 		skipPatterns.add("wsdl4j*.jar");
 		skipPatterns.add("xercesImpl.jar");
@@ -114,6 +123,7 @@ final class TldPatterns {
 		skipPatterns.add("xmlParserAPIs-*.jar");
 		skipPatterns.add("xmlParserAPIs.jar");
 		skipPatterns.add("xom-*.jar");
+
 		TOMCAT_SKIP = Collections.unmodifiableSet(skipPatterns);
 	}
 

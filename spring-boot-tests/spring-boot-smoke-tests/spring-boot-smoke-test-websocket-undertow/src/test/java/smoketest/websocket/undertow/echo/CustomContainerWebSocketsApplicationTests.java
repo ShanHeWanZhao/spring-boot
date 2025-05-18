@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoCon
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.embedded.undertow.UndertowServletWebServerFactory;
-import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -59,8 +59,8 @@ class CustomContainerWebSocketsApplicationTests {
 	void echoEndpoint() {
 		ConfigurableApplicationContext context = new SpringApplicationBuilder(ClientConfiguration.class,
 				PropertyPlaceholderAutoConfiguration.class)
-						.properties("websocket.uri:ws://localhost:" + this.port + "/ws/echo/websocket")
-						.run("--spring.main.web-application-type=none");
+			.properties("websocket.uri:ws://localhost:" + this.port + "/ws/echo/websocket")
+			.run("--spring.main.web-application-type=none");
 		long count = context.getBean(ClientConfiguration.class).latch.getCount();
 		AtomicReference<String> messagePayloadReference = context.getBean(ClientConfiguration.class).messagePayload;
 		context.close();
@@ -72,8 +72,8 @@ class CustomContainerWebSocketsApplicationTests {
 	void reverseEndpoint() {
 		ConfigurableApplicationContext context = new SpringApplicationBuilder(ClientConfiguration.class,
 				PropertyPlaceholderAutoConfiguration.class)
-						.properties("websocket.uri:ws://localhost:" + this.port + "/ws/reverse")
-						.run("--spring.main.web-application-type=none");
+			.properties("websocket.uri:ws://localhost:" + this.port + "/ws/reverse")
+			.run("--spring.main.web-application-type=none");
 		long count = context.getBean(ClientConfiguration.class).latch.getCount();
 		AtomicReference<String> messagePayloadReference = context.getBean(ClientConfiguration.class).messagePayload;
 		context.close();

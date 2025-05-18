@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import org.gradle.api.GradleException;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
-import org.gradle.util.ConfigureUtil;
 
 import org.springframework.boot.buildpack.platform.docker.configuration.DockerConfiguration;
 
@@ -40,6 +39,8 @@ public class DockerSpec {
 	private boolean tlsVerify;
 
 	private String certPath;
+
+	private boolean bindHostToBuilder;
 
 	private final DockerRegistrySpec builderRegistry;
 
@@ -85,6 +86,16 @@ public class DockerSpec {
 		this.certPath = certPath;
 	}
 
+	@Input
+	@Optional
+	public Boolean isBindHostToBuilder() {
+		return this.bindHostToBuilder;
+	}
+
+	public void setBindHostToBuilder(boolean use) {
+		this.bindHostToBuilder = use;
+	}
+
 	/**
 	 * Returns the {@link DockerRegistrySpec} that configures authentication to the
 	 * builder registry.
@@ -110,7 +121,7 @@ public class DockerSpec {
 	 * @param closure the closure to apply
 	 */
 	public void builderRegistry(Closure<?> closure) {
-		builderRegistry(ConfigureUtil.configureUsing(closure));
+		builderRegistry(Closures.asAction(closure));
 	}
 
 	/**
@@ -138,7 +149,7 @@ public class DockerSpec {
 	 * @param closure the closure to apply
 	 */
 	public void publishRegistry(Closure<?> closure) {
-		publishRegistry(ConfigureUtil.configureUsing(closure));
+		publishRegistry(Closures.asAction(closure));
 	}
 
 	/**
@@ -150,6 +161,7 @@ public class DockerSpec {
 	DockerConfiguration asDockerConfiguration() {
 		DockerConfiguration dockerConfiguration = new DockerConfiguration();
 		dockerConfiguration = customizeHost(dockerConfiguration);
+		dockerConfiguration = dockerConfiguration.withBindHostToBuilder(this.bindHostToBuilder);
 		dockerConfiguration = customizeBuilderAuthentication(dockerConfiguration);
 		dockerConfiguration = customizePublishAuthentication(dockerConfiguration);
 		return dockerConfiguration;
@@ -179,7 +191,7 @@ public class DockerSpec {
 
 	private DockerConfiguration customizePublishAuthentication(DockerConfiguration dockerConfiguration) {
 		if (this.publishRegistry == null || this.publishRegistry.hasEmptyAuth()) {
-			return dockerConfiguration;
+			return dockerConfiguration.withEmptyPublishRegistryAuthentication();
 		}
 		if (this.publishRegistry.hasTokenAuth() && !this.publishRegistry.hasUserAuth()) {
 			return dockerConfiguration.withPublishRegistryTokenAuthentication(this.publishRegistry.getToken());

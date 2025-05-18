@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +16,25 @@
 
 package org.springframework.boot.context.metrics.buffering;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 import org.junit.jupiter.api.Test;
 
+import org.springframework.boot.context.metrics.buffering.StartupTimeline.TimelineEvent;
 import org.springframework.core.metrics.StartupStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 /**
  * Tests for {@link BufferingApplicationStartup}.
  *
  * @author Brian Clozel
+ * @author Phillip Webb
  */
 class BufferingApplicationStartupTests {
 
@@ -47,13 +55,14 @@ class BufferingApplicationStartupTests {
 		StartupStep filtered = applicationStartup.start("filtered.second");
 		applicationStartup.start("spring.third").end();
 		filtered.end();
-		assertThat(applicationStartup.getBufferedTimeline().getEvents()).hasSize(2);
-		StartupTimeline.TimelineEvent firstEvent = applicationStartup.getBufferedTimeline().getEvents().get(0);
-		assertThat(firstEvent.getStartupStep().getId()).isEqualTo(1);
-		assertThat(firstEvent.getStartupStep().getParentId()).isEqualTo(0);
-		StartupTimeline.TimelineEvent secondEvent = applicationStartup.getBufferedTimeline().getEvents().get(1);
-		assertThat(secondEvent.getStartupStep().getId()).isEqualTo(3);
-		assertThat(secondEvent.getStartupStep().getParentId()).isEqualTo(2);
+		List<TimelineEvent> events = applicationStartup.getBufferedTimeline().getEvents();
+		assertThat(events).hasSize(2);
+		StartupTimeline.TimelineEvent firstEvent = events.get(0);
+		assertThat(firstEvent.getStartupStep().getId()).isEqualTo(0);
+		assertThat(firstEvent.getStartupStep().getParentId()).isNull();
+		StartupTimeline.TimelineEvent secondEvent = events.get(1);
+		assertThat(secondEvent.getStartupStep().getId()).isEqualTo(2);
+		assertThat(secondEvent.getStartupStep().getParentId()).isEqualTo(1);
 	}
 
 	@Test
@@ -78,8 +87,8 @@ class BufferingApplicationStartupTests {
 	void startRecordingShouldFailIfEventsWereRecorded() {
 		BufferingApplicationStartup applicationStartup = new BufferingApplicationStartup(2);
 		applicationStartup.start("first").end();
-		assertThatThrownBy(applicationStartup::startRecording).isInstanceOf(IllegalStateException.class)
-				.hasMessage("Cannot restart recording once steps have been buffered.");
+		assertThatIllegalStateException().isThrownBy(applicationStartup::startRecording)
+			.withMessage("Cannot restart recording once steps have been buffered.");
 	}
 
 	@Test
@@ -87,8 +96,8 @@ class BufferingApplicationStartupTests {
 		BufferingApplicationStartup applicationStartup = new BufferingApplicationStartup(2);
 		StartupStep step = applicationStartup.start("first");
 		step.end();
-		assertThatThrownBy(() -> step.tag("name", "value")).isInstanceOf(IllegalStateException.class)
-				.hasMessage("StartupStep has already ended.");
+		assertThatIllegalStateException().isThrownBy(() -> step.tag("name", "value"))
+			.withMessage("StartupStep has already ended.");
 	}
 
 	@Test
@@ -96,8 +105,54 @@ class BufferingApplicationStartupTests {
 		BufferingApplicationStartup applicationStartup = new BufferingApplicationStartup(2);
 		StartupStep step = applicationStartup.start("first");
 		step.tag("name", "value");
-		assertThatThrownBy(() -> step.getTags().iterator().remove()).isInstanceOf(UnsupportedOperationException.class)
-				.hasMessage("tags are append only");
+		assertThatExceptionOfType(UnsupportedOperationException.class)
+			.isThrownBy(() -> step.getTags().iterator().remove());
+	}
+
+	@Test // gh-25792
+	void outOfOrderWithMultipleEndCallsShouldNotFail() {
+		BufferingApplicationStartup applicationStartup = new BufferingApplicationStartup(200);
+		StartupStep one = applicationStartup.start("one");
+		StartupStep two = applicationStartup.start("two");
+		StartupStep three = applicationStartup.start("three");
+		two.end();
+		two.end();
+		two.end();
+		StartupStep four = applicationStartup.start("four");
+		four.end();
+		three.end();
+		one.end();
+	}
+
+	@Test // gh-25792
+	void multiThreadedAccessShouldWork() throws InterruptedException {
+		BufferingApplicationStartup applicationStartup = new BufferingApplicationStartup(5000);
+		Queue<Exception> errors = new ConcurrentLinkedQueue<>();
+		List<Thread> threads = new ArrayList<>();
+		for (int thread = 0; thread < 20; thread++) {
+			String prefix = "thread-" + thread + "-";
+			threads.add(new Thread(() -> {
+				try {
+					for (int i = 0; i < 100; i++) {
+						StartupStep step = applicationStartup.start(prefix + i);
+						try {
+							Thread.sleep(1);
+						}
+						catch (InterruptedException ex) {
+						}
+						step.end();
+					}
+				}
+				catch (Exception ex) {
+					errors.add(ex);
+				}
+			}));
+		}
+		threads.forEach(Thread::start);
+		for (Thread thread : threads) {
+			thread.join();
+		}
+		assertThat(errors).isEmpty();
 	}
 
 }

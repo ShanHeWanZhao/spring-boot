@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,29 +61,29 @@ public class StartMojo extends AbstractRunMojo {
 	 * The JMX name of the automatically deployed MBean managing the lifecycle of the
 	 * spring application.
 	 */
-	@Parameter
-	private String jmxName = SpringApplicationAdminClient.DEFAULT_OBJECT_NAME;
+	@Parameter(defaultValue = SpringApplicationAdminClient.DEFAULT_OBJECT_NAME)
+	private String jmxName;
 
 	/**
 	 * The port to use to expose the platform MBeanServer if the application is forked.
 	 */
-	@Parameter
-	private int jmxPort = 9001;
+	@Parameter(defaultValue = "9001")
+	private int jmxPort;
 
 	/**
-	 * The number of milli-seconds to wait between each attempt to check if the spring
+	 * The number of milliseconds to wait between each attempt to check if the spring
 	 * application is ready.
 	 */
-	@Parameter
-	private long wait = 500;
+	@Parameter(property = "spring-boot.start.wait", defaultValue = "500")
+	private long wait;
 
 	/**
 	 * The maximum number of attempts to check if the spring application is ready.
 	 * Combined with the "wait" argument, this gives a global timeout value (30 sec by
 	 * default)
 	 */
-	@Parameter
-	private int maxAttempts = 60;
+	@Parameter(property = "spring-boot.start.maxAttempts", defaultValue = "60")
+	private int maxAttempts;
 
 	private final Object lock = new Object();
 
@@ -113,6 +113,7 @@ public class StartMojo extends AbstractRunMojo {
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	protected RunArguments resolveApplicationArguments() {
 		RunArguments applicationArguments = super.resolveApplicationArguments();
 		applicationArguments.getArgs().addLast(ENABLE_MBEAN_PROPERTY);
@@ -123,6 +124,7 @@ public class StartMojo extends AbstractRunMojo {
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	protected RunArguments resolveJvmArguments() {
 		RunArguments jvmArguments = super.resolveJvmArguments();
 		if (isFork()) {
@@ -138,6 +140,7 @@ public class StartMojo extends AbstractRunMojo {
 	}
 
 	@Override
+	@Deprecated
 	protected void runWithMavenJvm(String startClassName, String... arguments) throws MojoExecutionException {
 		IsolatedThreadGroup threadGroup = new IsolatedThreadGroup(startClassName);
 		Thread launchThread = new Thread(threadGroup, new LaunchRunner(startClassName, arguments),
@@ -171,6 +174,7 @@ public class StartMojo extends AbstractRunMojo {
 				"Spring application did not start before the configured timeout (" + (wait * maxAttempts) + "ms");
 	}
 
+	@SuppressWarnings("deprecation")
 	private void waitForSpringApplication() throws MojoFailureException, MojoExecutionException {
 		try {
 			if (isFork()) {
@@ -181,14 +185,15 @@ public class StartMojo extends AbstractRunMojo {
 			}
 		}
 		catch (IOException ex) {
-			throw new MojoFailureException("Could not contact Spring Boot application", ex);
+			throw new MojoFailureException("Could not contact Spring Boot application over JMX on port " + this.jmxPort
+					+ ". Please make sure that no other process is using that port", ex);
 		}
 		catch (Exception ex) {
 			throw new MojoExecutionException("Could not figure out if the application has started", ex);
 		}
 	}
 
-	private void waitForForkedSpringApplication() throws IOException, MojoFailureException, MojoExecutionException {
+	private void waitForForkedSpringApplication() throws IOException, MojoExecutionException {
 		try {
 			getLog().debug("Connecting to local MBeanServer at port " + this.jmxPort);
 			try (JMXConnector connector = execute(this.wait, this.maxAttempts, new CreateJmxConnector(this.jmxPort))) {
@@ -210,7 +215,7 @@ public class StartMojo extends AbstractRunMojo {
 	}
 
 	private void doWaitForSpringApplication(MBeanServerConnection connection)
-			throws IOException, MojoExecutionException, MojoFailureException {
+			throws MojoExecutionException, MojoFailureException {
 		final SpringApplicationAdminClient client = new SpringApplicationAdminClient(connection, this.jmxName);
 		try {
 			execute(this.wait, this.maxAttempts, () -> (client.isReady() ? true : null));

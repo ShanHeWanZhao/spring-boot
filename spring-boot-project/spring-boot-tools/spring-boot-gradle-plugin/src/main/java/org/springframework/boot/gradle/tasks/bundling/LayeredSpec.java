@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import groovy.lang.Closure;
 import org.gradle.api.Action;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Optional;
-import org.gradle.util.ConfigureUtil;
 
 import org.springframework.boot.loader.tools.Layer;
 import org.springframework.boot.loader.tools.Layers;
@@ -41,7 +40,7 @@ import org.springframework.boot.loader.tools.layer.LibraryContentFilter;
 import org.springframework.util.Assert;
 
 /**
- * Encapsulates the configuration for a layered jar.
+ * Encapsulates the configuration for a layered archive.
  *
  * @author Madhura Bhave
  * @author Scott Frederick
@@ -65,7 +64,7 @@ public class LayeredSpec {
 
 	/**
 	 * Returns whether the layer tools should be included as a dependency in the layered
-	 * jar.
+	 * archive.
 	 * @return whether the layer tools should be included
 	 */
 	@Input
@@ -74,7 +73,8 @@ public class LayeredSpec {
 	}
 
 	/**
-	 * Sets whether the layer tools should be included as a dependency in the layered jar.
+	 * Sets whether the layer tools should be included as a dependency in the layered
+	 * archive.
 	 * @param includeLayerTools {@code true} if the layer tools should be included,
 	 * otherwise {@code false}
 	 */
@@ -83,7 +83,7 @@ public class LayeredSpec {
 	}
 
 	/**
-	 * Returns whether the layers.idx should be included in the jar.
+	 * Returns whether the layers.idx should be included in the archive.
 	 * @return whether the layers.idx should be included
 	 */
 	@Input
@@ -92,8 +92,8 @@ public class LayeredSpec {
 	}
 
 	/**
-	 * Sets whether the layers.idx should be included in the jar.
-	 * @param enabled {@code true} layers.idx should be included in the jar, otherwise
+	 * Sets whether the layers.idx should be included in the archive.
+	 * @param enabled {@code true} layers.idx should be included in the archive, otherwise
 	 * {@code false}
 	 */
 	public void setEnabled(boolean enabled) {
@@ -132,7 +132,7 @@ public class LayeredSpec {
 	 * @param closure the closure
 	 */
 	public void application(Closure<?> closure) {
-		application(ConfigureUtil.configureUsing(closure));
+		application(Closures.asAction(closure));
 	}
 
 	/**
@@ -167,11 +167,12 @@ public class LayeredSpec {
 	 * @param closure the closure
 	 */
 	public void dependencies(Closure<?> closure) {
-		dependencies(ConfigureUtil.configureUsing(closure));
+		dependencies(Closures.asAction(closure));
 	}
 
 	/**
-	 * Returns the order of the layers in the jar from least to most frequently changing.
+	 * Returns the order of the layers in the archive from least to most frequently
+	 * changing.
 	 * @return the layer order
 	 */
 	@Input
@@ -180,7 +181,7 @@ public class LayeredSpec {
 	}
 
 	/**
-	 * Sets to order of the layers in the jar from least to most frequently changing.
+	 * Sets the order of the layers in the archive from least to most frequently changing.
 	 * @param layerOrder the layer order
 	 */
 	public void setLayerOrder(String... layerOrder) {
@@ -188,7 +189,7 @@ public class LayeredSpec {
 	}
 
 	/**
-	 * Sets to order of the layers in the jar from least to most frequently changing.
+	 * Sets the order of the layers in the archive from least to most frequently changing.
 	 * @param layerOrder the layer order
 	 */
 	public void setLayerOrder(List<String> layerOrder) {
@@ -222,18 +223,20 @@ public class LayeredSpec {
 	/**
 	 * Base class for specs that control the layers to which a category of content should
 	 * belong.
+	 *
+	 * @param <S> the type of {@link IntoLayerSpec} used by this spec
 	 */
-	public abstract static class IntoLayersSpec implements Serializable {
+	public abstract static class IntoLayersSpec<S extends IntoLayerSpec> implements Serializable {
 
 		private final List<IntoLayerSpec> intoLayers;
 
-		private final Function<String, IntoLayerSpec> specFactory;
+		private final Function<String, S> specFactory;
 
 		boolean isEmpty() {
 			return this.intoLayers.isEmpty();
 		}
 
-		IntoLayersSpec(Function<String, IntoLayerSpec> specFactory, IntoLayerSpec... spec) {
+		IntoLayersSpec(Function<String, S> specFactory, IntoLayerSpec... spec) {
 			this.intoLayers = new ArrayList<>(Arrays.asList(spec));
 			this.specFactory = specFactory;
 		}
@@ -243,11 +246,11 @@ public class LayeredSpec {
 		}
 
 		public void intoLayer(String layer, Closure<?> closure) {
-			intoLayer(layer, ConfigureUtil.configureUsing(closure));
+			intoLayer(layer, Closures.asAction(closure));
 		}
 
-		public void intoLayer(String layer, Action<IntoLayerSpec> action) {
-			IntoLayerSpec spec = this.specFactory.apply(layer);
+		public void intoLayer(String layer, Action<S> action) {
+			S spec = this.specFactory.apply(layer);
 			action.execute(spec);
 			this.intoLayers.add(spec);
 		}
@@ -360,14 +363,16 @@ public class LayeredSpec {
 
 		ContentSelector<Library> asLibrarySelector(Function<String, ContentFilter<Library>> filterFactory) {
 			Layer layer = new Layer(getIntoLayer());
-			List<ContentFilter<Library>> includeFilters = getIncludes().stream().map(filterFactory)
-					.collect(Collectors.toList());
+			List<ContentFilter<Library>> includeFilters = getIncludes().stream()
+				.map(filterFactory)
+				.collect(Collectors.toList());
 			if (this.includeProjectDependencies) {
 				includeFilters = new ArrayList<>(includeFilters);
 				includeFilters.add(Library::isLocal);
 			}
-			List<ContentFilter<Library>> excludeFilters = getExcludes().stream().map(filterFactory)
-					.collect(Collectors.toList());
+			List<ContentFilter<Library>> excludeFilters = getExcludes().stream()
+				.map(filterFactory)
+				.collect(Collectors.toList());
 			if (this.excludeProjectDependencies) {
 				excludeFilters = new ArrayList<>(excludeFilters);
 				excludeFilters.add(Library::isLocal);
@@ -381,7 +386,7 @@ public class LayeredSpec {
 	 * An {@link IntoLayersSpec} that controls the layers to which application classes and
 	 * resources belong.
 	 */
-	public static class ApplicationSpec extends IntoLayersSpec {
+	public static class ApplicationSpec extends IntoLayersSpec<IntoLayerSpec> {
 
 		/**
 		 * Creates a new {@code ApplicationSpec} with the given {@code contents}.
@@ -410,7 +415,7 @@ public class LayeredSpec {
 	/**
 	 * An {@link IntoLayersSpec} that controls the layers to which dependencies belong.
 	 */
-	public static class DependenciesSpec extends IntoLayersSpec implements Serializable {
+	public static class DependenciesSpec extends IntoLayersSpec<DependenciesIntoLayerSpec> implements Serializable {
 
 		/**
 		 * Creates a new {@code DependenciesSpec} with the given {@code contents}.
@@ -425,10 +430,11 @@ public class LayeredSpec {
 					(spec) -> ((DependenciesIntoLayerSpec) spec).asLibrarySelector(LibraryContentFilter::new));
 		}
 
-		private static final class IntoLayerSpecFactory implements Function<String, IntoLayerSpec>, Serializable {
+		private static final class IntoLayerSpecFactory
+				implements Function<String, DependenciesIntoLayerSpec>, Serializable {
 
 			@Override
-			public IntoLayerSpec apply(String layer) {
+			public DependenciesIntoLayerSpec apply(String layer) {
 				return new DependenciesIntoLayerSpec(layer);
 			}
 

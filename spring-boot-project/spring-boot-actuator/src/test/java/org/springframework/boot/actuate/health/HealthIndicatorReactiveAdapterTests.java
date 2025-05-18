@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ class HealthIndicatorReactiveAdapterTests {
 		HealthIndicatorReactiveAdapter adapter = new HealthIndicatorReactiveAdapter(delegate);
 		Health status = Health.up().build();
 		given(delegate.health()).willReturn(status);
-		StepVerifier.create(adapter.health()).expectNext(status).verifyComplete();
+		StepVerifier.create(adapter.health()).expectNext(status).expectComplete().verify(Duration.ofSeconds(30));
 	}
 
 	@Test
@@ -52,9 +52,13 @@ class HealthIndicatorReactiveAdapterTests {
 	void delegateRunsOnTheElasticScheduler() {
 		String currentThread = Thread.currentThread().getName();
 		HealthIndicator delegate = () -> Health
-				.status(Thread.currentThread().getName().equals(currentThread) ? Status.DOWN : Status.UP).build();
+			.status(Thread.currentThread().getName().equals(currentThread) ? Status.DOWN : Status.UP)
+			.build();
 		HealthIndicatorReactiveAdapter adapter = new HealthIndicatorReactiveAdapter(delegate);
-		StepVerifier.create(adapter.health()).expectNext(Health.status(Status.UP).build()).verifyComplete();
+		StepVerifier.create(adapter.health())
+			.expectNext(Health.status(Status.UP).build())
+			.expectComplete()
+			.verify(Duration.ofSeconds(30));
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,18 +26,20 @@ import java.util.Properties;
 import org.gradle.api.Project;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.initialization.GradlePropertiesController;
-import org.gradle.testfixtures.ProjectBuilder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.springframework.boot.gradle.junit.GradleProjectBuilder;
 import org.springframework.boot.testsupport.classpath.ClassPathExclusions;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Tests for {@link BuildInfo}.
  *
  * @author Andy Wilkinson
+ * @author Vedran Pavic
  */
 @ClassPathExclusions("kotlin-daemon-client-*")
 class BuildInfoTests {
@@ -49,8 +51,8 @@ class BuildInfoTests {
 	void basicExecution() {
 		Properties properties = buildInfoProperties(createTask(createProject("test")));
 		assertThat(properties).containsKey("build.time");
-		assertThat(properties).containsEntry("build.artifact", "unspecified");
-		assertThat(properties).containsEntry("build.group", "");
+		assertThat(properties).doesNotContainKey("build.artifact");
+		assertThat(properties).doesNotContainKey("build.group");
 		assertThat(properties).containsEntry("build.name", "test");
 		assertThat(properties).containsEntry("build.version", "unspecified");
 	}
@@ -60,6 +62,20 @@ class BuildInfoTests {
 		BuildInfo task = createTask(createProject("test"));
 		task.getProperties().setArtifact("custom");
 		assertThat(buildInfoProperties(task)).containsEntry("build.artifact", "custom");
+	}
+
+	@Test
+	void artifactCanBeRemovedFromPropertiesUsingNull() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setArtifact(null);
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.artifact");
+	}
+
+	@Test
+	void artifactCanBeRemovedFromPropertiesUsingEmptyString() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setArtifact("");
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.artifact");
 	}
 
 	@Test
@@ -77,10 +93,38 @@ class BuildInfoTests {
 	}
 
 	@Test
+	void groupCanBeRemovedFromPropertiesUsingNull() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setGroup(null);
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.group");
+	}
+
+	@Test
+	void groupCanBeRemovedFromPropertiesUsingEmptyString() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setGroup("");
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.group");
+	}
+
+	@Test
 	void customNameIsReflectedInProperties() {
 		BuildInfo task = createTask(createProject("test"));
 		task.getProperties().setName("Example");
 		assertThat(buildInfoProperties(task)).containsEntry("build.name", "Example");
+	}
+
+	@Test
+	void nameCanBeRemovedFromPropertiesUsingNull() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setName(null);
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.name");
+	}
+
+	@Test
+	void nameCanBeRemovedFromPropertiesUsingEmptyString() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setName("");
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.name");
 	}
 
 	@Test
@@ -95,6 +139,20 @@ class BuildInfoTests {
 		BuildInfo task = createTask(createProject("test"));
 		task.getProperties().setVersion("2.3.4");
 		assertThat(buildInfoProperties(task)).containsEntry("build.version", "2.3.4");
+	}
+
+	@Test
+	void versionCanBeRemovedFromPropertiesUsingNull() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setVersion(null);
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.version");
+	}
+
+	@Test
+	void versionCanBeRemovedFromPropertiesUsingEmptyString() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().setVersion("");
+		assertThat(buildInfoProperties(task)).doesNotContainKey("build.version");
 	}
 
 	@Test
@@ -129,11 +187,20 @@ class BuildInfoTests {
 		assertThat(buildInfoProperties(task)).containsEntry("build.b", "bravo");
 	}
 
+	@Test
+	void nullAdditionalPropertyProducesInformativeFailure() {
+		BuildInfo task = createTask(createProject("test"));
+		task.getProperties().getAdditional().put("a", null);
+		assertThatExceptionOfType(Throwable.class).isThrownBy(() -> buildInfoProperties(task))
+			.withMessage("Additional property 'a' is illegal as its value is null");
+	}
+
 	private Project createProject(String projectName) {
 		File projectDir = new File(this.temp, projectName);
-		Project project = ProjectBuilder.builder().withProjectDir(projectDir).withName(projectName).build();
-		((ProjectInternal) project).getServices().get(GradlePropertiesController.class)
-				.loadGradlePropertiesFrom(projectDir);
+		Project project = GradleProjectBuilder.builder().withProjectDir(projectDir).withName(projectName).build();
+		((ProjectInternal) project).getServices()
+			.get(GradlePropertiesController.class)
+			.loadGradlePropertiesFrom(projectDir);
 		return project;
 	}
 

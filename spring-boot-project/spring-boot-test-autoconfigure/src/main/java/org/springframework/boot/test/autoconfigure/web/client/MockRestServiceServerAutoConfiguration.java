@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,10 @@ import java.lang.reflect.Constructor;
 import java.time.Duration;
 import java.util.Map;
 
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.test.web.client.MockServerRestTemplateCustomizer;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpRequest;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.test.web.client.ExpectedCount;
@@ -42,7 +42,7 @@ import org.springframework.web.client.RestTemplate;
  * @since 1.4.0
  * @see AutoConfigureMockRestServiceServer
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @ConditionalOnProperty(prefix = "spring.test.webclient.mockrestserviceserver", name = "enabled")
 public class MockRestServiceServerAutoConfiguration {
 
@@ -64,7 +64,7 @@ public class MockRestServiceServerAutoConfiguration {
 	private MockRestServiceServer createDeferredMockRestServiceServer(MockServerRestTemplateCustomizer customizer)
 			throws Exception {
 		Constructor<MockRestServiceServer> constructor = MockRestServiceServer.class
-				.getDeclaredConstructor(RequestExpectationManager.class);
+			.getDeclaredConstructor(RequestExpectationManager.class);
 		constructor.setAccessible(true);
 		return constructor.newInstance(new DeferredRequestExpectationManager(customizer));
 	}

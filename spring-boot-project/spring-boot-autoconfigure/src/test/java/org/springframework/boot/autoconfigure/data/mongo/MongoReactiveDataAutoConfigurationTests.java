@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,8 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MongoReactiveDataAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
-					MongoReactiveAutoConfiguration.class, MongoReactiveDataAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
+				MongoReactiveAutoConfiguration.class, MongoReactiveDataAutoConfiguration.class));
 
 	@Test
 	void templateExists() {
@@ -55,14 +55,7 @@ class MongoReactiveDataAutoConfigurationTests {
 	@Test
 	void whenGridFsDatabaseIsConfiguredThenGridFsTemplateUsesIt() {
 		this.contextRunner.withPropertyValues("spring.data.mongodb.gridfs.database:grid")
-				.run((context) -> assertThat(grisFsTemplateDatabaseName(context)).isEqualTo("grid"));
-	}
-
-	@Test
-	@Deprecated
-	void whenGridFsDatabaseIsConfiguredWithDeprecatedPropertyThenGridFsTemplateUsesIt() {
-		this.contextRunner.withPropertyValues("spring.data.mongodb.gridFsDatabase:grid")
-				.run((context) -> assertThat(grisFsTemplateDatabaseName(context)).isEqualTo("grid"));
+			.run((context) -> assertThat(grisFsTemplateDatabaseName(context)).isEqualTo("grid"));
 	}
 
 	@Test
@@ -77,7 +70,7 @@ class MongoReactiveDataAutoConfigurationTests {
 	@Test
 	void backsOffIfMongoClientBeanIsNotPresent() {
 		ApplicationContextRunner runner = new ApplicationContextRunner().withConfiguration(AutoConfigurations
-				.of(PropertyPlaceholderAutoConfiguration.class, MongoReactiveDataAutoConfiguration.class));
+			.of(PropertyPlaceholderAutoConfiguration.class, MongoReactiveDataAutoConfiguration.class));
 		runner.run((context) -> assertThat(context).doesNotHaveBean(MongoReactiveDataAutoConfiguration.class));
 	}
 

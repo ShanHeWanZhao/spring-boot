@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,6 @@ class CloudPlatformTests {
 		Environment environment = new MockEnvironment();
 		CloudPlatform platform = CloudPlatform.getActive(environment);
 		assertThat(platform).isNull();
-
 	}
 
 	@Test
@@ -134,6 +133,63 @@ class CloudPlatformTests {
 	}
 
 	@Test
+	void getActiveWhenHasAllAzureEnvVariablesShouldReturnAzureAppService() {
+		Map<String, Object> envVars = new HashMap<>();
+		envVars.put("WEBSITE_SITE_NAME", "---");
+		envVars.put("WEBSITE_INSTANCE_ID", "1234");
+		envVars.put("WEBSITE_RESOURCE_GROUP", "test");
+		envVars.put("WEBSITE_SKU", "1234");
+		Environment environment = getEnvironmentWithEnvVariables(envVars);
+		CloudPlatform platform = CloudPlatform.getActive(environment);
+		assertThat(platform).isEqualTo(CloudPlatform.AZURE_APP_SERVICE);
+		assertThat(platform.isActive(environment)).isTrue();
+	}
+
+	@Test
+	void getActiveWhenHasMissingWebsiteSiteNameShouldNotReturnAzureAppService() {
+		Map<String, Object> envVars = new HashMap<>();
+		envVars.put("WEBSITE_INSTANCE_ID", "1234");
+		envVars.put("WEBSITE_RESOURCE_GROUP", "test");
+		envVars.put("WEBSITE_SKU", "1234");
+		Environment environment = getEnvironmentWithEnvVariables(envVars);
+		CloudPlatform platform = CloudPlatform.getActive(environment);
+		assertThat(platform).isNull();
+	}
+
+	@Test
+	void getActiveWhenHasMissingWebsiteInstanceIdShouldNotReturnAzureAppService() {
+		Map<String, Object> envVars = new HashMap<>();
+		envVars.put("WEBSITE_SITE_NAME", "---");
+		envVars.put("WEBSITE_RESOURCE_GROUP", "test");
+		envVars.put("WEBSITE_SKU", "1234");
+		Environment environment = getEnvironmentWithEnvVariables(envVars);
+		CloudPlatform platform = CloudPlatform.getActive(environment);
+		assertThat(platform).isNull();
+	}
+
+	@Test
+	void getActiveWhenHasMissingWebsiteResourceGroupShouldNotReturnAzureAppService() {
+		Map<String, Object> envVars = new HashMap<>();
+		envVars.put("WEBSITE_SITE_NAME", "---");
+		envVars.put("WEBSITE_INSTANCE_ID", "1234");
+		envVars.put("WEBSITE_SKU", "1234");
+		Environment environment = getEnvironmentWithEnvVariables(envVars);
+		CloudPlatform platform = CloudPlatform.getActive(environment);
+		assertThat(platform).isNull();
+	}
+
+	@Test
+	void getActiveWhenHasMissingWebsiteSkuShouldNotReturnAzureAppService() {
+		Map<String, Object> envVars = new HashMap<>();
+		envVars.put("WEBSITE_SITE_NAME", "---");
+		envVars.put("WEBSITE_INSTANCE_ID", "1234");
+		envVars.put("WEBSITE_RESOURCE_GROUP", "test");
+		Environment environment = getEnvironmentWithEnvVariables(envVars);
+		CloudPlatform platform = CloudPlatform.getActive(environment);
+		assertThat(platform).isNull();
+	}
+
+	@Test
 	void getActiveWhenHasEnforcedCloudPlatform() {
 		Environment environment = getEnvironmentWithEnvVariables(
 				Collections.singletonMap("spring.main.cloud-platform", "kubernetes"));
@@ -186,7 +242,7 @@ class CloudPlatformTests {
 		Environment environment = getEnvironmentWithEnvVariables(envVars);
 		((MockEnvironment) environment).setProperty("spring.main.cloud-platform", "none");
 		assertThat(Stream.of(CloudPlatform.values()).filter((platform) -> platform.isActive(environment)))
-				.containsExactly(CloudPlatform.NONE);
+			.containsExactly(CloudPlatform.NONE);
 	}
 
 	private Environment getEnvironmentWithEnvVariables(Map<String, Object> environmentVariables) {

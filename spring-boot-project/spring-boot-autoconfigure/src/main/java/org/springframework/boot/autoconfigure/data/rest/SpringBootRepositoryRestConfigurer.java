@@ -47,12 +47,6 @@ class SpringBootRepositoryRestConfigurer implements RepositoryRestConfigurer {
 	}
 
 	@Override
-	@SuppressWarnings("deprecation")
-	public void configureRepositoryRestConfiguration(RepositoryRestConfiguration config) {
-		configureRepositoryRestConfiguration(config, null);
-	}
-
-	@Override
 	public void configureRepositoryRestConfiguration(RepositoryRestConfiguration config, CorsRegistry cors) {
 		this.properties.applyTo(config);
 	}

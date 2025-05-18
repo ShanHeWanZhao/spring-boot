@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,14 +38,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Andy Wilkinson
  */
-public class BomPluginIntegrationTests {
+class BomPluginIntegrationTests {
 
 	private File projectDir;
 
 	private File buildFile;
 
 	@BeforeEach
-	public void setup(@TempDir File projectDir) throws IOException {
+	void setup(@TempDir File projectDir) {
 		this.projectDir = projectDir;
 		this.buildFile = new File(this.projectDir, "build.gradle");
 	}
@@ -75,12 +75,14 @@ public class BomPluginIntegrationTests {
 			assertThat(dependency).textAtPath("version").isEqualTo("${activemq.version}");
 			assertThat(dependency).textAtPath("scope").isNullOrEmpty();
 			assertThat(dependency).textAtPath("type").isNullOrEmpty();
+			assertThat(dependency).textAtPath("classifier").isNullOrEmpty();
 			dependency = pom.nodeAtPath("//dependencyManagement/dependencies/dependency[2]");
 			assertThat(dependency).textAtPath("groupId").isEqualTo("org.apache.activemq");
 			assertThat(dependency).textAtPath("artifactId").isEqualTo("activemq-blueprint");
 			assertThat(dependency).textAtPath("version").isEqualTo("${activemq.version}");
 			assertThat(dependency).textAtPath("scope").isNullOrEmpty();
 			assertThat(dependency).textAtPath("type").isNullOrEmpty();
+			assertThat(dependency).textAtPath("classifier").isNullOrEmpty();
 		});
 	}
 
@@ -135,6 +137,7 @@ public class BomPluginIntegrationTests {
 			assertThat(dependency).textAtPath("version").isEqualTo("${jackson-bom.version}");
 			assertThat(dependency).textAtPath("scope").isEqualTo("import");
 			assertThat(dependency).textAtPath("type").isEqualTo("pom");
+			assertThat(dependency).textAtPath("classifier").isNullOrEmpty();
 		});
 	}
 
@@ -164,9 +167,99 @@ public class BomPluginIntegrationTests {
 			assertThat(dependency).textAtPath("version").isEqualTo("${mysql.version}");
 			assertThat(dependency).textAtPath("scope").isNullOrEmpty();
 			assertThat(dependency).textAtPath("type").isNullOrEmpty();
+			assertThat(dependency).textAtPath("classifier").isNullOrEmpty();
 			NodeAssert exclusion = dependency.nodeAtPath("exclusions/exclusion");
 			assertThat(exclusion).textAtPath("groupId").isEqualTo("com.google.protobuf");
 			assertThat(exclusion).textAtPath("artifactId").isEqualTo("protobuf-java");
+		});
+	}
+
+	@Test
+	void moduleTypesAreIncludedInDependencyManagementOfGeneratedPom() throws IOException {
+		try (PrintWriter out = new PrintWriter(new FileWriter(this.buildFile))) {
+			out.println("plugins {");
+			out.println("    id 'org.springframework.boot.bom'");
+			out.println("}");
+			out.println("bom {");
+			out.println("    library('Elasticsearch', '7.15.2') {");
+			out.println("        group('org.elasticsearch.distribution.integ-test-zip') {");
+			out.println("            modules = [");
+			out.println("                'elasticsearch' {");
+			out.println("                    type = 'zip'");
+			out.println("                }");
+			out.println("            ]");
+			out.println("        }");
+			out.println("    }");
+			out.println("}");
+		}
+		generatePom((pom) -> {
+			assertThat(pom).textAtPath("//properties/elasticsearch.version").isEqualTo("7.15.2");
+			NodeAssert dependency = pom.nodeAtPath("//dependencyManagement/dependencies/dependency");
+			assertThat(dependency).textAtPath("groupId").isEqualTo("org.elasticsearch.distribution.integ-test-zip");
+			assertThat(dependency).textAtPath("artifactId").isEqualTo("elasticsearch");
+			assertThat(dependency).textAtPath("version").isEqualTo("${elasticsearch.version}");
+			assertThat(dependency).textAtPath("scope").isNullOrEmpty();
+			assertThat(dependency).textAtPath("type").isEqualTo("zip");
+			assertThat(dependency).textAtPath("classifier").isNullOrEmpty();
+			assertThat(dependency).nodeAtPath("exclusions").isNull();
+		});
+	}
+
+	@Test
+	void moduleClassifiersAreIncludedInDependencyManagementOfGeneratedPom() throws IOException {
+		try (PrintWriter out = new PrintWriter(new FileWriter(this.buildFile))) {
+			out.println("plugins {");
+			out.println("    id 'org.springframework.boot.bom'");
+			out.println("}");
+			out.println("bom {");
+			out.println("    library('Kafka', '2.7.2') {");
+			out.println("        group('org.apache.kafka') {");
+			out.println("            modules = [");
+			out.println("                'connect-api',");
+			out.println("                'generator',");
+			out.println("                'generator' {");
+			out.println("                    classifier = 'test'");
+			out.println("                },");
+			out.println("                'kafka-tools',");
+			out.println("            ]");
+			out.println("        }");
+			out.println("    }");
+			out.println("}");
+		}
+		generatePom((pom) -> {
+			assertThat(pom).textAtPath("//properties/kafka.version").isEqualTo("2.7.2");
+			NodeAssert connectApi = pom.nodeAtPath("//dependencyManagement/dependencies/dependency[1]");
+			assertThat(connectApi).textAtPath("groupId").isEqualTo("org.apache.kafka");
+			assertThat(connectApi).textAtPath("artifactId").isEqualTo("connect-api");
+			assertThat(connectApi).textAtPath("version").isEqualTo("${kafka.version}");
+			assertThat(connectApi).textAtPath("scope").isNullOrEmpty();
+			assertThat(connectApi).textAtPath("type").isNullOrEmpty();
+			assertThat(connectApi).textAtPath("classifier").isNullOrEmpty();
+			assertThat(connectApi).nodeAtPath("exclusions").isNull();
+			NodeAssert generator = pom.nodeAtPath("//dependencyManagement/dependencies/dependency[2]");
+			assertThat(generator).textAtPath("groupId").isEqualTo("org.apache.kafka");
+			assertThat(generator).textAtPath("artifactId").isEqualTo("generator");
+			assertThat(generator).textAtPath("version").isEqualTo("${kafka.version}");
+			assertThat(generator).textAtPath("scope").isNullOrEmpty();
+			assertThat(generator).textAtPath("type").isNullOrEmpty();
+			assertThat(generator).textAtPath("classifier").isNullOrEmpty();
+			assertThat(generator).nodeAtPath("exclusions").isNull();
+			NodeAssert generatorTest = pom.nodeAtPath("//dependencyManagement/dependencies/dependency[3]");
+			assertThat(generatorTest).textAtPath("groupId").isEqualTo("org.apache.kafka");
+			assertThat(generatorTest).textAtPath("artifactId").isEqualTo("generator");
+			assertThat(generatorTest).textAtPath("version").isEqualTo("${kafka.version}");
+			assertThat(generatorTest).textAtPath("scope").isNullOrEmpty();
+			assertThat(generatorTest).textAtPath("type").isNullOrEmpty();
+			assertThat(generatorTest).textAtPath("classifier").isEqualTo("test");
+			assertThat(generatorTest).nodeAtPath("exclusions").isNull();
+			NodeAssert kafkaTools = pom.nodeAtPath("//dependencyManagement/dependencies/dependency[4]");
+			assertThat(kafkaTools).textAtPath("groupId").isEqualTo("org.apache.kafka");
+			assertThat(kafkaTools).textAtPath("artifactId").isEqualTo("kafka-tools");
+			assertThat(kafkaTools).textAtPath("version").isEqualTo("${kafka.version}");
+			assertThat(kafkaTools).textAtPath("scope").isNullOrEmpty();
+			assertThat(kafkaTools).textAtPath("type").isNullOrEmpty();
+			assertThat(kafkaTools).textAtPath("classifier").isNullOrEmpty();
+			assertThat(kafkaTools).nodeAtPath("exclusions").isNull();
 		});
 	}
 
@@ -197,9 +290,41 @@ public class BomPluginIntegrationTests {
 		});
 	}
 
+	// @Test
+	// void versionAlignmentIsVerified() throws IOException {
+	// try (PrintWriter out = new PrintWriter(new FileWriter(this.buildFile))) {
+	// out.println("plugins {");
+	// out.println(" id 'org.springframework.boot.bom'");
+	// out.println("}");
+	// out.println("bom {");
+	// out.println(" library('OAuth2 OIDC SDK', '8.36.1') {");
+	// out.println(" alignedWith('Spring Security') {");
+	// out.println(
+	// "
+	// source('https://github.com/spring-projects/spring-security/blob/${libraryVersion}/config/gradle/dependency-locks/optional.lockfile')");
+	// out.println(" pattern('com.nimbusds:oauth2-oidc-sdk:(.+)')");
+	// out.println(" }");
+	// out.println(" group('com.nimbusds') {");
+	// out.println(" modules = [");
+	// out.println(" 'oauth2-oidc-sdk'");
+	// out.println(" ]");
+	// out.println(" }");
+	// out.println(" }");
+	// out.println(" library('Spring Security', '5.4.7') {");
+	// out.println(" }");
+	// out.println("}");
+	// }
+	// System.out.println(runGradle(DeployedPlugin.GENERATE_POM_TASK_NAME,
+	// "-s").getOutput());
+	// }
+
 	private BuildResult runGradle(String... args) {
-		return GradleRunner.create().withDebug(true).withProjectDir(this.projectDir).withArguments(args)
-				.withPluginClasspath().build();
+		return GradleRunner.create()
+			.withDebug(true)
+			.withProjectDir(this.projectDir)
+			.withArguments(args)
+			.withPluginClasspath()
+			.build();
 	}
 
 	private void generatePom(Consumer<NodeAssert> consumer) {

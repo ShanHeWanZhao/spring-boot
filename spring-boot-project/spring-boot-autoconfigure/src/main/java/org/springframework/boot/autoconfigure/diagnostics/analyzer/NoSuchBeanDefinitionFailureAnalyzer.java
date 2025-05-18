@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,9 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.BeanFactoryUtils;
 import org.springframework.beans.factory.InjectionPoint;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -63,18 +61,17 @@ import org.springframework.util.ClassUtils;
  *
  * @author Stephane Nicoll
  * @author Phillip Webb
+ * @author Scott Frederick
  */
-class NoSuchBeanDefinitionFailureAnalyzer extends AbstractInjectionFailureAnalyzer<NoSuchBeanDefinitionException>
-		implements BeanFactoryAware {
+class NoSuchBeanDefinitionFailureAnalyzer extends AbstractInjectionFailureAnalyzer<NoSuchBeanDefinitionException> {
 
-	private ConfigurableListableBeanFactory beanFactory;
+	private final ConfigurableListableBeanFactory beanFactory;
 
-	private MetadataReaderFactory metadataReaderFactory;
+	private final MetadataReaderFactory metadataReaderFactory;
 
-	private ConditionEvaluationReport report;
+	private final ConditionEvaluationReport report;
 
-	@Override
-	public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+	NoSuchBeanDefinitionFailureAnalyzer(BeanFactory beanFactory) {
 		Assert.isInstanceOf(ConfigurableListableBeanFactory.class, beanFactory);
 		this.beanFactory = (ConfigurableListableBeanFactory) beanFactory;
 		this.metadataReaderFactory = new CachingMetadataReaderFactory(this.beanFactory.getBeanClassLoader());
@@ -119,7 +116,7 @@ class NoSuchBeanDefinitionFailureAnalyzer extends AbstractInjectionFailureAnalyz
 			Constructor<?> constructor = (Constructor<?>) injectionPoint.getMember();
 			Class<?> declaringClass = constructor.getDeclaringClass();
 			MergedAnnotation<ConfigurationProperties> configurationProperties = MergedAnnotations.from(declaringClass)
-					.get(ConfigurationProperties.class);
+				.get(ConfigurationProperties.class);
 			if (configurationProperties.isPresent()) {
 				if (KotlinDetector.isKotlinType(declaringClass) && !KotlinDetector.isKotlinReflectPresent()) {
 					action = String.format(
@@ -165,9 +162,9 @@ class NoSuchBeanDefinitionFailureAnalyzer extends AbstractInjectionFailureAnalyz
 		}
 		String[] beanNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(this.beanFactory, type);
 		return Arrays.stream(beanNames)
-				.map((beanName) -> new UserConfigurationResult(getFactoryMethodMetadata(beanName),
-						this.beanFactory.getBean(beanName).equals(null)))
-				.collect(Collectors.toList());
+			.map((beanName) -> new UserConfigurationResult(getFactoryMethodMetadata(beanName),
+					this.beanFactory.getBean(beanName).equals(null)))
+			.collect(Collectors.toList());
 	}
 
 	private MethodMetadata getFactoryMethodMetadata(String beanName) {
@@ -181,8 +178,8 @@ class NoSuchBeanDefinitionFailureAnalyzer extends AbstractInjectionFailureAnalyz
 	private void collectReportedConditionOutcomes(NoSuchBeanDefinitionException cause,
 			List<AutoConfigurationResult> results) {
 		this.report.getConditionAndOutcomesBySource()
-				.forEach((source, sourceOutcomes) -> collectReportedConditionOutcomes(cause, new Source(source),
-						sourceOutcomes, results));
+			.forEach((source, sourceOutcomes) -> collectReportedConditionOutcomes(cause, new Source(source),
+					sourceOutcomes, results));
 	}
 
 	private void collectReportedConditionOutcomes(NoSuchBeanDefinitionException cause, Source source,
@@ -255,9 +252,9 @@ class NoSuchBeanDefinitionFailureAnalyzer extends AbstractInjectionFailureAnalyz
 		private List<MethodMetadata> findBeanMethods(Source source, NoSuchBeanDefinitionException cause) {
 			try {
 				MetadataReader classMetadata = NoSuchBeanDefinitionFailureAnalyzer.this.metadataReaderFactory
-						.getMetadataReader(source.getClassName());
+					.getMetadataReader(source.getClassName());
 				Set<MethodMetadata> candidates = classMetadata.getAnnotationMetadata()
-						.getAnnotatedMethods(Bean.class.getName());
+					.getAnnotatedMethods(Bean.class.getName());
 				List<MethodMetadata> result = new ArrayList<>();
 				for (MethodMetadata candidate : candidates) {
 					if (isMatch(candidate, source, cause)) {

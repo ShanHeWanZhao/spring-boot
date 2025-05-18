@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.security.saml2.provider.service.registration.Saml2MessageBinding;
 
@@ -31,6 +30,7 @@ import org.springframework.security.saml2.provider.service.registration.Saml2Mes
  *
  * @author Madhura Bhave
  * @author Phillip Webb
+ * @author Moritz Halbritter
  * @since 2.2.0
  */
 @ConfigurationProperties("spring.security.saml2.relyingparty")
@@ -65,10 +65,19 @@ public class Saml2RelyingPartyProperties {
 
 		private final Decryption decryption = new Decryption();
 
+		private final Singlelogout singlelogout = new Singlelogout();
+
 		/**
 		 * Remote SAML Identity Provider.
 		 */
-		private final Identityprovider identityprovider = new Identityprovider();
+		private final AssertingParty assertingparty = new AssertingParty();
+
+		/**
+		 * Remote SAML Identity Provider.
+		 * @deprecated use {@link #assertingparty}
+		 */
+		@Deprecated
+		private final AssertingParty identityprovider = new AssertingParty();
 
 		public String getEntityId() {
 			return this.entityId;
@@ -90,8 +99,22 @@ public class Saml2RelyingPartyProperties {
 			return this.decryption;
 		}
 
-		public Identityprovider getIdentityprovider() {
+		public AssertingParty getAssertingparty() {
+			return this.assertingparty;
+		}
+
+		/**
+		 * Remote SAML Identity Provider.
+		 * @return remote SAML Identity Provider
+		 * @deprecated use {@link #getAssertingparty()}
+		 */
+		@Deprecated
+		public AssertingParty getIdentityprovider() {
 			return this.identityprovider;
+		}
+
+		public Singlelogout getSinglelogout() {
+			return this.singlelogout;
 		}
 
 		public static class Acs {
@@ -225,7 +248,7 @@ public class Saml2RelyingPartyProperties {
 	/**
 	 * Represents a remote Identity Provider.
 	 */
-	public static class Identityprovider {
+	public static class AssertingParty {
 
 		/**
 		 * Unique identifier for the identity provider.
@@ -240,6 +263,8 @@ public class Saml2RelyingPartyProperties {
 		private final Singlesignon singlesignon = new Singlesignon();
 
 		private final Verification verification = new Verification();
+
+		private final Singlelogout singlelogout = new Singlelogout();
 
 		public String getEntityId() {
 			return this.entityId;
@@ -257,23 +282,16 @@ public class Saml2RelyingPartyProperties {
 			this.metadataUri = metadataUri;
 		}
 
-		@Deprecated
-		@DeprecatedConfigurationProperty(reason = "moved to 'singlesignon.url'")
-		public String getSsoUrl() {
-			return this.singlesignon.getUrl();
-		}
-
-		@Deprecated
-		public void setSsoUrl(String ssoUrl) {
-			this.singlesignon.setUrl(ssoUrl);
-		}
-
 		public Singlesignon getSinglesignon() {
 			return this.singlesignon;
 		}
 
 		public Verification getVerification() {
 			return this.verification;
+		}
+
+		public Singlelogout getSinglelogout() {
+			return this.singlelogout;
 		}
 
 		/**
@@ -289,12 +307,12 @@ public class Saml2RelyingPartyProperties {
 			/**
 			 * Whether to redirect or post authentication requests.
 			 */
-			private Saml2MessageBinding binding = Saml2MessageBinding.REDIRECT;
+			private Saml2MessageBinding binding;
 
 			/**
 			 * Whether to sign authentication requests.
 			 */
-			private boolean signRequest = true;
+			private Boolean signRequest;
 
 			public String getUrl() {
 				return this.url;
@@ -316,7 +334,11 @@ public class Saml2RelyingPartyProperties {
 				return this.signRequest;
 			}
 
-			public void setSignRequest(boolean signRequest) {
+			public Boolean getSignRequest() {
+				return this.signRequest;
+			}
+
+			public void setSignRequest(Boolean signRequest) {
 				this.signRequest = signRequest;
 			}
 
@@ -358,6 +380,52 @@ public class Saml2RelyingPartyProperties {
 
 			}
 
+		}
+
+	}
+
+	/**
+	 * Single logout details.
+	 */
+	public static class Singlelogout {
+
+		/**
+		 * Location where SAML2 LogoutRequest gets sent to.
+		 */
+		private String url;
+
+		/**
+		 * Location where SAML2 LogoutResponse gets sent to.
+		 */
+		private String responseUrl;
+
+		/**
+		 * Whether to redirect or post logout requests.
+		 */
+		private Saml2MessageBinding binding;
+
+		public String getUrl() {
+			return this.url;
+		}
+
+		public void setUrl(String url) {
+			this.url = url;
+		}
+
+		public String getResponseUrl() {
+			return this.responseUrl;
+		}
+
+		public void setResponseUrl(String responseUrl) {
+			this.responseUrl = responseUrl;
+		}
+
+		public Saml2MessageBinding getBinding() {
+			return this.binding;
+		}
+
+		public void setBinding(Saml2MessageBinding binding) {
+			this.binding = binding;
 		}
 
 	}

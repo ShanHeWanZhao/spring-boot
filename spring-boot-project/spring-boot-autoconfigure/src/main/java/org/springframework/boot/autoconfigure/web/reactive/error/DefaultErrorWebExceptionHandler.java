@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,22 +94,6 @@ public class DefaultErrorWebExceptionHandler extends AbstractErrorWebExceptionHa
 	/**
 	 * Create a new {@code DefaultErrorWebExceptionHandler} instance.
 	 * @param errorAttributes the error attributes
-	 * @param resourceProperties the resources configuration properties
-	 * @param errorProperties the error configuration properties
-	 * @param applicationContext the current application context
-	 * @deprecated since 2.4.0 for removal in 2.6.0 in favor of
-	 * {@link #DefaultErrorWebExceptionHandler(ErrorAttributes, Resources, ErrorProperties, ApplicationContext)}
-	 */
-	@Deprecated
-	public DefaultErrorWebExceptionHandler(ErrorAttributes errorAttributes,
-			org.springframework.boot.autoconfigure.web.ResourceProperties resourceProperties,
-			ErrorProperties errorProperties, ApplicationContext applicationContext) {
-		this(errorAttributes, (Resources) resourceProperties, errorProperties, applicationContext);
-	}
-
-	/**
-	 * Create a new {@code DefaultErrorWebExceptionHandler} instance.
-	 * @param errorAttributes the error attributes
 	 * @param resources the resources configuration properties
 	 * @param errorProperties the error configuration properties
 	 * @param applicationContext the current application context
@@ -136,10 +120,10 @@ public class DefaultErrorWebExceptionHandler extends AbstractErrorWebExceptionHa
 		int errorStatus = getHttpStatus(error);
 		ServerResponse.BodyBuilder responseBody = ServerResponse.status(errorStatus).contentType(TEXT_HTML_UTF8);
 		return Flux.just(getData(errorStatus).toArray(new String[] {}))
-				.flatMap((viewName) -> renderErrorView(viewName, responseBody, error))
-				.switchIfEmpty(this.errorProperties.getWhitelabel().isEnabled()
-						? renderDefaultErrorView(responseBody, error) : Mono.error(getError(request)))
-				.next();
+			.flatMap((viewName) -> renderErrorView(viewName, responseBody, error))
+			.switchIfEmpty(this.errorProperties.getWhitelabel().isEnabled()
+					? renderDefaultErrorView(responseBody, error) : Mono.error(getError(request)))
+			.next();
 	}
 
 	private List<String> getData(int errorStatus) {
@@ -160,8 +144,9 @@ public class DefaultErrorWebExceptionHandler extends AbstractErrorWebExceptionHa
 	 */
 	protected Mono<ServerResponse> renderErrorResponse(ServerRequest request) {
 		Map<String, Object> error = getErrorAttributes(request, getErrorAttributeOptions(request, MediaType.ALL));
-		return ServerResponse.status(getHttpStatus(error)).contentType(MediaType.APPLICATION_JSON)
-				.body(BodyInserters.fromValue(error));
+		return ServerResponse.status(getHttpStatus(error))
+			.contentType(MediaType.APPLICATION_JSON)
+			.body(BodyInserters.fromValue(error));
 	}
 
 	protected ErrorAttributeOptions getErrorAttributeOptions(ServerRequest request, MediaType mediaType) {
@@ -187,16 +172,14 @@ public class DefaultErrorWebExceptionHandler extends AbstractErrorWebExceptionHa
 	 * @param produces the media type produced (or {@code MediaType.ALL})
 	 * @return if the stacktrace attribute should be included
 	 */
-	@SuppressWarnings("deprecation")
 	protected boolean isIncludeStackTrace(ServerRequest request, MediaType produces) {
 		switch (this.errorProperties.getIncludeStacktrace()) {
-		case ALWAYS:
-			return true;
-		case ON_PARAM:
-		case ON_TRACE_PARAM:
-			return isTraceEnabled(request);
-		default:
-			return false;
+			case ALWAYS:
+				return true;
+			case ON_PARAM:
+				return isTraceEnabled(request);
+			default:
+				return false;
 		}
 	}
 
@@ -208,12 +191,12 @@ public class DefaultErrorWebExceptionHandler extends AbstractErrorWebExceptionHa
 	 */
 	protected boolean isIncludeMessage(ServerRequest request, MediaType produces) {
 		switch (this.errorProperties.getIncludeMessage()) {
-		case ALWAYS:
-			return true;
-		case ON_PARAM:
-			return isMessageEnabled(request);
-		default:
-			return false;
+			case ALWAYS:
+				return true;
+			case ON_PARAM:
+				return isMessageEnabled(request);
+			default:
+				return false;
 		}
 	}
 
@@ -225,12 +208,12 @@ public class DefaultErrorWebExceptionHandler extends AbstractErrorWebExceptionHa
 	 */
 	protected boolean isIncludeBindingErrors(ServerRequest request, MediaType produces) {
 		switch (this.errorProperties.getIncludeBindingErrors()) {
-		case ALWAYS:
-			return true;
-		case ON_PARAM:
-			return isBindingErrorsEnabled(request);
-		default:
-			return false;
+			case ALWAYS:
+				return true;
+			case ON_PARAM:
+				return isBindingErrorsEnabled(request);
+			default:
+				return false;
 		}
 	}
 

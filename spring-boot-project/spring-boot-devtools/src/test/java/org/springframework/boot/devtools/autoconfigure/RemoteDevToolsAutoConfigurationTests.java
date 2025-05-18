@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.BeanIds;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -97,7 +96,7 @@ class RemoteDevToolsAutoConfigurationTests {
 	void disabledIfRemoteSecretIsMissing() throws Exception {
 		this.context = getContext(() -> loadContext("a:b"));
 		assertThatExceptionOfType(NoSuchBeanDefinitionException.class)
-				.isThrownBy(() -> this.context.getBean(DispatcherFilter.class));
+			.isThrownBy(() -> this.context.getBean(DispatcherFilter.class));
 	}
 
 	@Test
@@ -154,10 +153,14 @@ class RemoteDevToolsAutoConfigurationTests {
 	void securityConfigurationShouldAllowAccess() throws Exception {
 		this.context = getContext(() -> loadContext("spring.devtools.remote.secret:supersecret"));
 		DispatcherFilter filter = this.context.getBean(DispatcherFilter.class);
-		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context).apply(springSecurity()).addFilter(filter)
-				.build();
-		mockMvc.perform(MockMvcRequestBuilders.get(DEFAULT_CONTEXT_PATH + "/restart").header(DEFAULT_SECRET_HEADER_NAME,
-				"supersecret")).andExpect(status().isOk());
+		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context)
+			.apply(springSecurity())
+			.addFilter(filter)
+			.build();
+		mockMvc
+			.perform(MockMvcRequestBuilders.get(DEFAULT_CONTEXT_PATH + "/restart")
+				.header(DEFAULT_SECRET_HEADER_NAME, "supersecret"))
+			.andExpect(status().isOk());
 		assertRestartInvoked(true);
 		assertThat(this.context.containsBean("devtoolsSecurityFilterChain")).isTrue();
 	}
@@ -167,11 +170,14 @@ class RemoteDevToolsAutoConfigurationTests {
 		this.context = getContext(() -> loadContext("spring.devtools.remote.secret:supersecret",
 				"server.servlet.context-path:/test", "spring.devtools.remote.context-path:/custom"));
 		DispatcherFilter filter = this.context.getBean(DispatcherFilter.class);
-		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context).apply(springSecurity()).addFilter(filter)
-				.build();
-		mockMvc.perform(
-				MockMvcRequestBuilders.get("/test/custom/restart").header(DEFAULT_SECRET_HEADER_NAME, "supersecret"))
-				.andExpect(status().isOk());
+		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context)
+			.apply(springSecurity())
+			.addFilter(filter)
+			.build();
+		mockMvc
+			.perform(MockMvcRequestBuilders.get("/test/custom/restart")
+				.header(DEFAULT_SECRET_HEADER_NAME, "supersecret"))
+			.andExpect(status().isOk());
 		assertRestartInvoked(true);
 	}
 
@@ -180,8 +186,10 @@ class RemoteDevToolsAutoConfigurationTests {
 		this.context = getContext(() -> loadContext("spring.devtools.remote.secret:supersecret"));
 		DispatcherFilter filter = this.context.getBean(DispatcherFilter.class);
 		Filter securityFilterChain = this.context.getBean(BeanIds.SPRING_SECURITY_FILTER_CHAIN, Filter.class);
-		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context).addFilter(securityFilterChain)
-				.addFilter(filter).build();
+		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context)
+			.addFilter(securityFilterChain)
+			.addFilter(filter)
+			.build();
 		mockMvc.perform(MockMvcRequestBuilders.get("/my-path")).andExpect(status().isUnauthorized());
 	}
 
@@ -197,10 +205,14 @@ class RemoteDevToolsAutoConfigurationTests {
 			return context;
 		});
 		DispatcherFilter filter = this.context.getBean(DispatcherFilter.class);
-		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context).apply(springSecurity()).addFilter(filter)
-				.build();
-		mockMvc.perform(MockMvcRequestBuilders.get(DEFAULT_CONTEXT_PATH + "/restart").header(DEFAULT_SECRET_HEADER_NAME,
-				"supersecret")).andExpect(status().isOk());
+		MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(this.context)
+			.apply(springSecurity())
+			.addFilter(filter)
+			.build();
+		mockMvc
+			.perform(MockMvcRequestBuilders.get(DEFAULT_CONTEXT_PATH + "/restart")
+				.header(DEFAULT_SECRET_HEADER_NAME, "supersecret"))
+			.andExpect(status().isOk());
 		assertRestartInvoked(true);
 	}
 
@@ -209,7 +221,7 @@ class RemoteDevToolsAutoConfigurationTests {
 		this.context = getContext(() -> loadContext("spring.devtools.remote.secret:supersecret",
 				"spring.devtools.remote.restart.enabled:false"));
 		assertThatExceptionOfType(NoSuchBeanDefinitionException.class)
-				.isThrownBy(() -> this.context.getBean("remoteRestartHandlerMapper"));
+			.isThrownBy(() -> this.context.getBean("remoteRestartHandlerMapper"));
 	}
 
 	@Test
@@ -273,7 +285,9 @@ class RemoteDevToolsAutoConfigurationTests {
 	}
 
 	@Configuration(proxyBeanMethods = false)
-	static class TestWebSecurityConfigurerAdapter extends WebSecurityConfigurerAdapter {
+	@SuppressWarnings("deprecation")
+	static class TestWebSecurityConfigurerAdapter
+			extends org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter {
 
 		@Override
 		protected void configure(HttpSecurity http) throws Exception {

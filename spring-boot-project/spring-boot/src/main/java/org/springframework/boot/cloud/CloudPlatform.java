@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 
 package org.springframework.boot.cloud;
+
+import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.ConfigurableEnvironment;
@@ -105,7 +108,7 @@ public enum CloudPlatform {
 
 		private boolean isAutoDetected(ConfigurableEnvironment environment) {
 			PropertySource<?> environmentPropertySource = environment.getPropertySources()
-					.get(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+				.get(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
 			if (environmentPropertySource != null) {
 				if (environmentPropertySource.containsProperty(KUBERNETES_SERVICE_HOST)
 						&& environmentPropertySource.containsProperty(KUBERNETES_SERVICE_PORT)) {
@@ -129,6 +132,21 @@ public enum CloudPlatform {
 				}
 			}
 			return false;
+		}
+
+	},
+
+	/**
+	 * Azure App Service platform.
+	 */
+	AZURE_APP_SERVICE {
+
+		private final List<String> azureEnvVariables = Arrays.asList("WEBSITE_SITE_NAME", "WEBSITE_INSTANCE_ID",
+				"WEBSITE_RESOURCE_GROUP", "WEBSITE_SKU");
+
+		@Override
+		public boolean isDetected(Environment environment) {
+			return this.azureEnvVariables.stream().allMatch(environment::containsProperty);
 		}
 
 	};

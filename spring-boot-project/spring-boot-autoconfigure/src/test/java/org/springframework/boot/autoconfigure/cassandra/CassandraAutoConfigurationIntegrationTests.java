@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,23 @@
 
 package org.springframework.boot.autoconfigure.cassandra;
 
-import java.time.Duration;
-
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.CassandraContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.boot.testsupport.testcontainers.DockerImageNames;
+import org.springframework.boot.testsupport.testcontainers.CassandraContainer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 
 /**
  * Integration tests for {@link CassandraAutoConfiguration}.
@@ -47,26 +43,27 @@ import static org.mockito.Mockito.verify;
 class CassandraAutoConfigurationIntegrationTests {
 
 	@Container
-	static final CassandraContainer<?> cassandra = new CassandraContainer<>(DockerImageNames.cassandra())
-			.withStartupAttempts(5).withStartupTimeout(Duration.ofMinutes(10));
+	static final CassandraContainer cassandra = new CassandraContainer();
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(CassandraAutoConfiguration.class)).withPropertyValues(
-					"spring.data.cassandra.contact-points:" + cassandra.getHost() + ":"
-							+ cassandra.getFirstMappedPort(),
-					"spring.data.cassandra.local-datacenter=datacenter1", "spring.data.cassandra.request.timeout=20s",
-					"spring.data.cassandra.connection.init-query-timeout=10s");
+		.withConfiguration(AutoConfigurations.of(CassandraAutoConfiguration.class))
+		.withPropertyValues(
+				"spring.data.cassandra.contact-points:" + cassandra.getHost() + ":" + cassandra.getFirstMappedPort(),
+				"spring.data.cassandra.local-datacenter=datacenter1",
+				"spring.data.cassandra.connection.connect-timeout=60s",
+				"spring.data.cassandra.connection.init-query-timeout=60s", "spring.data.cassandra.request.timeout=60s");
 
 	@Test
 	void whenTheContextIsClosedThenTheDriverConfigLoaderIsClosed() {
 		this.contextRunner.withUserConfiguration(DriverConfigLoaderSpyConfiguration.class).run((context) -> {
 			assertThat(((BeanDefinitionRegistry) context.getSourceApplicationContext())
-					.getBeanDefinition("cassandraDriverConfigLoader").getDestroyMethodName()).isEmpty();
+				.getBeanDefinition("cassandraDriverConfigLoader")
+				.getDestroyMethodName()).isEmpty();
 			// Initialize lazy bean
 			context.getBean(CqlSession.class);
 			DriverConfigLoader driverConfigLoader = context.getBean(DriverConfigLoader.class);
 			context.close();
-			verify(driverConfigLoader).close();
+			then(driverConfigLoader).should().close();
 		});
 	}
 
@@ -78,7 +75,7 @@ class CassandraAutoConfigurationIntegrationTests {
 			return new BeanPostProcessor() {
 
 				@Override
-				public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+				public Object postProcessAfterInitialization(Object bean, String beanName) {
 					if (bean instanceof DriverConfigLoader) {
 						return spy(bean);
 					}

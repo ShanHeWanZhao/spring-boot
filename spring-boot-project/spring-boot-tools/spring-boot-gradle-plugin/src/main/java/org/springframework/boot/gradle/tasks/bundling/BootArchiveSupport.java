@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
+import org.gradle.api.GradleException;
 import org.gradle.api.file.CopySpec;
 import org.gradle.api.file.FileCopyDetails;
 import org.gradle.api.file.FileTreeElement;
@@ -36,17 +38,20 @@ import org.gradle.api.internal.file.copy.CopyActionProcessingStream;
 import org.gradle.api.internal.file.copy.FileCopyDetailsInternal;
 import org.gradle.api.java.archives.Attributes;
 import org.gradle.api.java.archives.Manifest;
+import org.gradle.api.provider.Property;
 import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
 import org.gradle.api.tasks.WorkResult;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.api.tasks.util.PatternSet;
+import org.gradle.util.GradleVersion;
 
 /**
  * Support class for implementations of {@link BootArchive}.
  *
  * @author Andy Wilkinson
  * @author Phillip Webb
+ * @author Scott Frederick
  * @see BootJar
  * @see BootWar
  */
@@ -76,15 +81,12 @@ class BootArchiveSupport {
 
 	private LaunchScriptConfiguration launchScript;
 
-	private boolean excludeDevtools = false;
-
 	BootArchiveSupport(String loaderMainClass, Spec<FileCopyDetails> librarySpec,
 			Function<FileCopyDetails, ZipCompression> compressionResolver) {
 		this.loaderMainClass = loaderMainClass;
 		this.librarySpec = librarySpec;
 		this.compressionResolver = compressionResolver;
 		this.requiresUnpack.include(Specs.satisfyNone());
-		configureExclusions();
 	}
 
 	void configureManifest(Manifest manifest, String mainClass, String classes, String lib, String classPathIndex,
@@ -116,6 +118,8 @@ class BootArchiveSupport {
 		File output = jar.getArchiveFile().get().getAsFile();
 		Manifest manifest = jar.getManifest();
 		boolean preserveFileTimestamps = jar.isPreserveFileTimestamps();
+		Integer dirMode = getDirMode(jar);
+		Integer fileMode = getFileMode(jar);
 		boolean includeDefaultLoader = isUsingDefaultLoader(jar);
 		Spec<FileTreeElement> requiresUnpack = this.requiresUnpack.getAsSpec();
 		Spec<FileTreeElement> exclusions = this.exclusions.getAsExcludeSpec();
@@ -123,10 +127,34 @@ class BootArchiveSupport {
 		Spec<FileCopyDetails> librarySpec = this.librarySpec;
 		Function<FileCopyDetails, ZipCompression> compressionResolver = this.compressionResolver;
 		String encoding = jar.getMetadataCharset();
-		CopyAction action = new BootZipCopyAction(output, manifest, preserveFileTimestamps, includeDefaultLoader,
-				layerToolsLocation, requiresUnpack, exclusions, launchScript, librarySpec, compressionResolver,
-				encoding, layerResolver);
+		CopyAction action = new BootZipCopyAction(output, manifest, preserveFileTimestamps, dirMode, fileMode,
+				includeDefaultLoader, layerToolsLocation, requiresUnpack, exclusions, launchScript, librarySpec,
+				compressionResolver, encoding, layerResolver);
 		return jar.isReproducibleFileOrder() ? new ReproducibleOrderingCopyAction(action) : action;
+	}
+
+	private Integer getDirMode(CopySpec copySpec) {
+		return getMode(copySpec, "getDirPermissions", copySpec::getDirMode);
+	}
+
+	private Integer getFileMode(CopySpec copySpec) {
+		return getMode(copySpec, "getFilePermissions", copySpec::getFileMode);
+	}
+
+	@SuppressWarnings("unchecked")
+	private Integer getMode(CopySpec copySpec, String methodName, Supplier<Integer> fallback) {
+		if (GradleVersion.current().compareTo(GradleVersion.version("8.3")) >= 0) {
+			try {
+				Object filePermissions = ((Property<Object>) copySpec.getClass().getMethod(methodName).invoke(copySpec))
+					.getOrNull();
+				return (filePermissions != null)
+						? (int) filePermissions.getClass().getMethod("toUnixNumeric").invoke(filePermissions) : null;
+			}
+			catch (Exception ex) {
+				throw new GradleException("Failed to get permissions", ex);
+			}
+		}
+		return fallback.get();
 	}
 
 	private boolean isUsingDefaultLoader(Jar jar) {
@@ -147,15 +175,6 @@ class BootArchiveSupport {
 
 	void requiresUnpack(Spec<FileTreeElement> spec) {
 		this.requiresUnpack.include(spec);
-	}
-
-	boolean isExcludeDevtools() {
-		return this.excludeDevtools;
-	}
-
-	void setExcludeDevtools(boolean excludeDevtools) {
-		this.excludeDevtools = excludeDevtools;
-		configureExclusions();
 	}
 
 	void excludeNonZipLibraryFiles(FileCopyDetails details) {
@@ -190,19 +209,11 @@ class BootArchiveSupport {
 		return true;
 	}
 
-	private void configureExclusions() {
-		Set<String> excludes = new HashSet<>();
-		if (this.excludeDevtools) {
-			excludes.add("**/spring-boot-devtools-*.jar");
-		}
-		this.exclusions.setExcludes(excludes);
-	}
-
 	void moveModuleInfoToRoot(CopySpec spec) {
-		spec.filesMatching("module-info.class", BootArchiveSupport::moveToRoot);
+		spec.filesMatching("module-info.class", this::moveToRoot);
 	}
 
-	private static void moveToRoot(FileCopyDetails details) {
+	void moveToRoot(FileCopyDetails details) {
 		details.setRelativePath(details.getRelativeSourcePath());
 	}
 

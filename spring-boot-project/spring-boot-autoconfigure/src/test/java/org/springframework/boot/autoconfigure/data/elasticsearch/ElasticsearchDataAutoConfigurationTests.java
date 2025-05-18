@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.TestAutoConfigurationPackage;
+import org.springframework.boot.autoconfigure.data.elasticsearch.city.City;
 import org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -53,8 +55,8 @@ import static org.mockito.Mockito.mock;
 class ElasticsearchDataAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(ElasticsearchRestClientAutoConfiguration.class,
-					ReactiveElasticsearchRestClientAutoConfiguration.class, ElasticsearchDataAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(ElasticsearchRestClientAutoConfiguration.class,
+				ReactiveElasticsearchRestClientAutoConfiguration.class, ElasticsearchDataAutoConfiguration.class));
 
 	@BeforeEach
 	void setUp() {
@@ -69,8 +71,10 @@ class ElasticsearchDataAutoConfigurationTests {
 	@Test
 	void defaultRestBeansRegistered() {
 		this.contextRunner.run((context) -> assertThat(context).hasSingleBean(ElasticsearchRestTemplate.class)
-				.hasSingleBean(ReactiveElasticsearchTemplate.class).hasSingleBean(ElasticsearchConverter.class)
-				.hasSingleBean(ElasticsearchConverter.class).hasSingleBean(ElasticsearchCustomConversions.class));
+			.hasSingleBean(ReactiveElasticsearchTemplate.class)
+			.hasSingleBean(ElasticsearchConverter.class)
+			.hasSingleBean(ElasticsearchConverter.class)
+			.hasSingleBean(ElasticsearchCustomConversions.class));
 	}
 
 	@Test
@@ -78,8 +82,8 @@ class ElasticsearchDataAutoConfigurationTests {
 		this.contextRunner.run((context) -> {
 			SimpleElasticsearchMappingContext mappingContext = context.getBean(SimpleElasticsearchMappingContext.class);
 			assertThat(mappingContext)
-					.extracting("simpleTypeHolder", InstanceOfAssertFactories.type(SimpleTypeHolder.class)).satisfies(
-							(simpleTypeHolder) -> assertThat(simpleTypeHolder.isSimpleType(BigDecimal.class)).isTrue());
+				.extracting("simpleTypeHolder", InstanceOfAssertFactories.type(SimpleTypeHolder.class))
+				.satisfies((simpleTypeHolder) -> assertThat(simpleTypeHolder.isSimpleType(BigDecimal.class)).isTrue());
 		});
 	}
 
@@ -87,22 +91,34 @@ class ElasticsearchDataAutoConfigurationTests {
 	void customConversionsShouldBeUsed() {
 		this.contextRunner.withUserConfiguration(CustomElasticsearchCustomConversions.class).run((context) -> {
 			assertThat(context).hasSingleBean(ElasticsearchCustomConversions.class).hasBean("testCustomConversions");
-			assertThat(context.getBean(ElasticsearchConverter.class).getConversionService()
-					.canConvert(ElasticsearchRestTemplate.class, Boolean.class)).isTrue();
+			assertThat(context.getBean(ElasticsearchConverter.class)
+				.getConversionService()
+				.canConvert(ElasticsearchRestTemplate.class, Boolean.class)).isTrue();
 		});
 	}
 
 	@Test
 	void customRestTemplateShouldBeUsed() {
-		this.contextRunner.withUserConfiguration(CustomRestTemplate.class).run((context) -> assertThat(context)
-				.getBeanNames(ElasticsearchRestTemplate.class).hasSize(1).contains("elasticsearchTemplate"));
+		this.contextRunner.withUserConfiguration(CustomRestTemplate.class)
+			.run((context) -> assertThat(context).getBeanNames(ElasticsearchRestTemplate.class)
+				.hasSize(1)
+				.contains("elasticsearchTemplate"));
 	}
 
 	@Test
 	void customReactiveRestTemplateShouldBeUsed() {
 		this.contextRunner.withUserConfiguration(CustomReactiveRestTemplate.class)
-				.run((context) -> assertThat(context).getBeanNames(ReactiveElasticsearchTemplate.class).hasSize(1)
-						.contains("reactiveElasticsearchTemplate"));
+			.run((context) -> assertThat(context).getBeanNames(ReactiveElasticsearchTemplate.class)
+				.hasSize(1)
+				.contains("reactiveElasticsearchTemplate"));
+	}
+
+	@Test
+	void shouldFilterInitialEntityScanWithDocumentAnnotation() {
+		this.contextRunner.withUserConfiguration(EntityScanConfig.class).run((context) -> {
+			SimpleElasticsearchMappingContext mappingContext = context.getBean(SimpleElasticsearchMappingContext.class);
+			assertThat(mappingContext.hasPersistentEntityFor(City.class)).isTrue();
+		});
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -132,6 +148,12 @@ class ElasticsearchDataAutoConfigurationTests {
 		ReactiveElasticsearchTemplate reactiveElasticsearchTemplate() {
 			return mock(ReactiveElasticsearchTemplate.class);
 		}
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	@TestAutoConfigurationPackage(City.class)
+	static class EntityScanConfig {
 
 	}
 

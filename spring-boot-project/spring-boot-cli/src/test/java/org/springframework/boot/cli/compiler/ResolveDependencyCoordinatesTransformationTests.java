@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,8 @@ import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.io.ReaderSource;
+import org.codehaus.groovy.syntax.Token;
+import org.codehaus.groovy.syntax.Types;
 import org.codehaus.groovy.transform.ASTTransformation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,7 +89,8 @@ final class ResolveDependencyCoordinatesTransformationTests {
 
 	@Test
 	void transformationOfAnnotationOnImport() {
-		this.moduleNode.addImport(null, null, Arrays.asList(this.grabAnnotation));
+		ClassNode classNode = new ClassNode("Test", 0, new ClassNode(Object.class));
+		this.moduleNode.addImport("alias", classNode, Arrays.asList(this.grabAnnotation));
 		assertGrabAnnotationHasBeenTransformed();
 	}
 
@@ -100,14 +103,16 @@ final class ResolveDependencyCoordinatesTransformationTests {
 
 	@Test
 	void transformationOfAnnotationOnStaticImport() {
-		this.moduleNode.addStaticImport(null, null, null, Arrays.asList(this.grabAnnotation));
+		ClassNode classNode = new ClassNode("Test", 0, new ClassNode(Object.class));
+		this.moduleNode.addStaticImport(classNode, "field", "alias", Arrays.asList(this.grabAnnotation));
 
 		assertGrabAnnotationHasBeenTransformed();
 	}
 
 	@Test
 	void transformationOfAnnotationOnStaticStarImport() {
-		this.moduleNode.addStaticStarImport(null, null, Arrays.asList(this.grabAnnotation));
+		ClassNode classNode = new ClassNode("Test", 0, new ClassNode(Object.class));
+		this.moduleNode.addStaticStarImport("test", classNode, Arrays.asList(this.grabAnnotation));
 
 		assertGrabAnnotationHasBeenTransformed();
 	}
@@ -192,8 +197,8 @@ final class ResolveDependencyCoordinatesTransformationTests {
 		ClassNode classNode = new ClassNode("Test", 0, new ClassNode(Object.class));
 		this.moduleNode.addClass(classNode);
 
-		DeclarationExpression declarationExpression = new DeclarationExpression(new VariableExpression("test"), null,
-				new ConstantExpression("test"));
+		DeclarationExpression declarationExpression = new DeclarationExpression(new VariableExpression("test"),
+				new Token(Types.ASSIGN, "=", 1, 1), new ConstantExpression("test"));
 		declarationExpression.addAnnotation(this.grabAnnotation);
 
 		BlockStatement code = new BlockStatement(Arrays.asList(new ExpressionStatement(declarationExpression)),

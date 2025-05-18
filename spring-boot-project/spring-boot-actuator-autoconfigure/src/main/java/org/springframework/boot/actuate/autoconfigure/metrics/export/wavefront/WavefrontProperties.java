@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,11 +51,26 @@ public class WavefrontProperties extends PushRegistryProperties {
 	private String apiToken;
 
 	/**
-	 * Global prefix to separate metrics originating from this app's white box
-	 * instrumentation from those originating from other Wavefront integrations when
-	 * viewed in the Wavefront UI.
+	 * Global prefix to separate metrics originating from this app's instrumentation from
+	 * those originating from other Wavefront integrations when viewed in the Wavefront
+	 * UI.
 	 */
 	private String globalPrefix;
+
+	/**
+	 * Whether to report histogram distributions aggregated into minute intervals.
+	 */
+	private boolean reportMinuteDistribution = true;
+
+	/**
+	 * Whether to report histogram distributions aggregated into hour intervals.
+	 */
+	private boolean reportHourDistribution;
+
+	/**
+	 * Whether to report histogram distributions aggregated into day intervals.
+	 */
+	private boolean reportDayDistribution;
 
 	private final Sender sender = new Sender();
 
@@ -95,12 +110,46 @@ public class WavefrontProperties extends PushRegistryProperties {
 		return this.sender;
 	}
 
+	public boolean isReportMinuteDistribution() {
+		return this.reportMinuteDistribution;
+	}
+
+	public void setReportMinuteDistribution(boolean reportMinuteDistribution) {
+		this.reportMinuteDistribution = reportMinuteDistribution;
+	}
+
+	public boolean isReportHourDistribution() {
+		return this.reportHourDistribution;
+	}
+
+	public void setReportHourDistribution(boolean reportHourDistribution) {
+		this.reportHourDistribution = reportHourDistribution;
+	}
+
+	public boolean isReportDayDistribution() {
+		return this.reportDayDistribution;
+	}
+
+	public void setReportDayDistribution(boolean reportDayDistribution) {
+		this.reportDayDistribution = reportDayDistribution;
+	}
+
 	public static class Sender {
 
+		/**
+		 * Maximum queue size of the in-memory buffer.
+		 */
 		private int maxQueueSize = 50000;
 
+		/**
+		 * Interval at which points are flushed to the Wavefront server.
+		 */
 		private Duration flushInterval = Duration.ofSeconds(1);
 
+		/**
+		 * Maximum message size, such that each batch is reported as one or more messages
+		 * where no message exceeds the specified size.
+		 */
 		private DataSize messageSize = DataSize.ofBytes(Integer.MAX_VALUE);
 
 		public int getMaxQueueSize() {

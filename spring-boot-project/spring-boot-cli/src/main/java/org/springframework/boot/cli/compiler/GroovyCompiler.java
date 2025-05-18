@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ServiceLoader;
 
+import groovy.grape.GrapeEngine;
 import groovy.lang.GroovyClassLoader;
 import groovy.lang.GroovyClassLoader.ClassCollector;
 import groovy.lang.GroovyCodeSource;
@@ -43,10 +45,9 @@ import org.codehaus.groovy.transform.ASTTransformation;
 import org.codehaus.groovy.transform.ASTTransformationVisitor;
 
 import org.springframework.boot.cli.compiler.dependencies.SpringBootDependenciesDependencyManagement;
-import org.springframework.boot.cli.compiler.grape.AetherGrapeEngine;
-import org.springframework.boot.cli.compiler.grape.AetherGrapeEngineFactory;
 import org.springframework.boot.cli.compiler.grape.DependencyResolutionContext;
 import org.springframework.boot.cli.compiler.grape.GrapeEngineInstaller;
+import org.springframework.boot.cli.compiler.grape.MavenResolverGrapeEngineFactory;
 import org.springframework.boot.cli.util.ResourceUtils;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.util.ClassUtils;
@@ -95,7 +96,7 @@ public class GroovyCompiler {
 		DependencyResolutionContext resolutionContext = new DependencyResolutionContext();
 		resolutionContext.addDependencyManagement(new SpringBootDependenciesDependencyManagement());
 
-		AetherGrapeEngine grapeEngine = AetherGrapeEngineFactory.create(this.loader,
+		GrapeEngine grapeEngine = MavenResolverGrapeEngineFactory.create(this.loader,
 				configuration.getRepositoryConfiguration(), resolutionContext, configuration.isQuiet());
 
 		GrapeEngineInstaller.install(grapeEngine);
@@ -216,16 +217,16 @@ public class GroovyCompiler {
 
 	@SuppressWarnings("rawtypes")
 	private void addAstTransformations(CompilationUnit compilationUnit) {
-		LinkedList[] phaseOperations = getPhaseOperations(compilationUnit);
-		processConversionOperations(phaseOperations[Phases.CONVERSION]);
+		Deque[] phaseOperations = getPhaseOperations(compilationUnit);
+		processConversionOperations((LinkedList) phaseOperations[Phases.CONVERSION]);
 	}
 
 	@SuppressWarnings("rawtypes")
-	private LinkedList[] getPhaseOperations(CompilationUnit compilationUnit) {
+	private Deque[] getPhaseOperations(CompilationUnit compilationUnit) {
 		try {
 			Field field = CompilationUnit.class.getDeclaredField("phaseOperations");
 			field.setAccessible(true);
-			return (LinkedList[]) field.get(compilationUnit);
+			return (Deque[]) field.get(compilationUnit);
 		}
 		catch (Exception ex) {
 			throw new IllegalStateException("Phase operations not available from compilation unit");
@@ -235,7 +236,7 @@ public class GroovyCompiler {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void processConversionOperations(LinkedList conversionOperations) {
 		int index = getIndexOfASTTransformationVisitor(conversionOperations);
-		conversionOperations.add(index, new CompilationUnit.SourceUnitOperation() {
+		conversionOperations.add(index, new CompilationUnit.ISourceUnitOperation() {
 			@Override
 			public void call(SourceUnit source) throws CompilationFailedException {
 				ASTNode[] nodes = new ASTNode[] { source.getAST() };
@@ -248,8 +249,10 @@ public class GroovyCompiler {
 
 	private int getIndexOfASTTransformationVisitor(List<?> conversionOperations) {
 		for (int index = 0; index < conversionOperations.size(); index++) {
-			if (conversionOperations.get(index).getClass().getName()
-					.startsWith(ASTTransformationVisitor.class.getName())) {
+			if (conversionOperations.get(index)
+				.getClass()
+				.getName()
+				.startsWith(ASTTransformationVisitor.class.getName())) {
 				return index;
 			}
 		}
@@ -270,11 +273,12 @@ public class GroovyCompiler {
 				throws CompilationFailedException {
 
 			ImportCustomizer importCustomizer = new SmartImportCustomizer(source);
-			ClassNode mainClassNode = MainClass.get(source.getAST().getClasses());
+			List<ClassNode> classNodes = source.getAST().getClasses();
+			ClassNode mainClassNode = MainClass.get(classNodes);
 
 			// Additional auto configuration
 			for (CompilerAutoConfiguration autoConfiguration : GroovyCompiler.this.compilerAutoConfigurations) {
-				if (autoConfiguration.matches(classNode)) {
+				if (classNodes.stream().anyMatch(autoConfiguration::matches)) {
 					if (GroovyCompiler.this.configuration.isGuessImports()) {
 						autoConfiguration.applyImports(importCustomizer);
 						importCustomizer.call(source, context, classNode);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.orm.jpa.JpaVendorAdapter;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.persistenceunit.PersistenceUnitManager;
+import org.springframework.orm.jpa.persistenceunit.PersistenceUnitPostProcessor;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
@@ -58,6 +59,8 @@ public class EntityManagerFactoryBuilder {
 
 	private AsyncTaskExecutor bootstrapExecutor;
 
+	private PersistenceUnitPostProcessor[] persistenceUnitPostProcessors;
+
 	/**
 	 * Create a new instance passing in the common pieces that will be shared if multiple
 	 * EntityManagerFactory instances are created.
@@ -79,7 +82,7 @@ public class EntityManagerFactoryBuilder {
 	 * @param persistenceUnitManager optional source of persistence unit information (can
 	 * be null)
 	 * @param persistenceUnitRootLocation the persistence unit root location to use as a
-	 * fallback (can be null)
+	 * fallback or {@code null}
 	 * @since 1.4.1
 	 */
 	public EntityManagerFactoryBuilder(JpaVendorAdapter jpaVendorAdapter, Map<String, ?> jpaProperties,
@@ -102,6 +105,17 @@ public class EntityManagerFactoryBuilder {
 	 */
 	public void setBootstrapExecutor(AsyncTaskExecutor bootstrapExecutor) {
 		this.bootstrapExecutor = bootstrapExecutor;
+	}
+
+	/**
+	 * Set the {@linkplain PersistenceUnitPostProcessor persistence unit post processors}
+	 * to be applied to the PersistenceUnitInfo used for creating the
+	 * {@link LocalContainerEntityManagerFactoryBean}.
+	 * @param persistenceUnitPostProcessors the persistence unit post processors to use
+	 * @since 2.5.0
+	 */
+	public void setPersistenceUnitPostProcessors(PersistenceUnitPostProcessor... persistenceUnitPostProcessors) {
+		this.persistenceUnitPostProcessors = persistenceUnitPostProcessors;
 	}
 
 	/**
@@ -206,7 +220,7 @@ public class EntityManagerFactoryBuilder {
 			LocalContainerEntityManagerFactoryBean entityManagerFactoryBean = new LocalContainerEntityManagerFactoryBean();
 			if (EntityManagerFactoryBuilder.this.persistenceUnitManager != null) {
 				entityManagerFactoryBean
-						.setPersistenceUnitManager(EntityManagerFactoryBuilder.this.persistenceUnitManager);
+					.setPersistenceUnitManager(EntityManagerFactoryBuilder.this.persistenceUnitManager);
 			}
 			if (this.persistenceUnit != null) {
 				entityManagerFactoryBean.setPersistenceUnitName(this.persistenceUnit);
@@ -231,6 +245,10 @@ public class EntityManagerFactoryBuilder {
 			}
 			if (EntityManagerFactoryBuilder.this.bootstrapExecutor != null) {
 				entityManagerFactoryBean.setBootstrapExecutor(EntityManagerFactoryBuilder.this.bootstrapExecutor);
+			}
+			if (EntityManagerFactoryBuilder.this.persistenceUnitPostProcessors != null) {
+				entityManagerFactoryBean
+					.setPersistenceUnitPostProcessors(EntityManagerFactoryBuilder.this.persistenceUnitPostProcessors);
 			}
 			return entityManagerFactoryBean;
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,27 +40,33 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests for {@link FlywayProperties}.
  *
  * @author Stephane Nicoll
+ * @author Chris Bono
  */
 class FlywayPropertiesTests {
 
+	@SuppressWarnings("deprecation")
 	@Test
 	void defaultValuesAreConsistent() {
 		FlywayProperties properties = new FlywayProperties();
 		Configuration configuration = new FluentConfiguration();
+		assertThat(configuration.isFailOnMissingLocations()).isEqualTo(properties.isFailOnMissingLocations());
 		assertThat(properties.getLocations().stream().map(Location::new).toArray(Location[]::new))
-				.isEqualTo(configuration.getLocations());
+			.isEqualTo(configuration.getLocations());
 		assertThat(properties.getEncoding()).isEqualTo(configuration.getEncoding());
 		assertThat(properties.getConnectRetries()).isEqualTo(configuration.getConnectRetries());
+		// Can't assert connect retries interval as it is new in Flyway 7.15
+		// Asserting hard-coded value in the metadata instead
+		assertThat(configuration.getConnectRetriesInterval()).isEqualTo(120);
 		// Can't assert lock retry count default as it is new in Flyway 7.1
 		// Asserting hard-coded value in the metadata instead
 		assertThat(configuration.getLockRetryCount()).isEqualTo(50);
 		assertThat(properties.getDefaultSchema()).isEqualTo(configuration.getDefaultSchema());
 		assertThat(properties.getSchemas()).isEqualTo(Arrays.asList(configuration.getSchemas()));
-		assertThat(properties.isCreateSchemas()).isEqualTo(configuration.getCreateSchemas());
+		assertThat(properties.isCreateSchemas()).isEqualTo(configuration.isCreateSchemas());
 		assertThat(properties.getTable()).isEqualTo(configuration.getTable());
 		assertThat(properties.getBaselineDescription()).isEqualTo(configuration.getBaselineDescription());
 		assertThat(MigrationVersion.fromVersion(properties.getBaselineVersion()))
-				.isEqualTo(configuration.getBaselineVersion());
+			.isEqualTo(configuration.getBaselineVersion());
 		assertThat(properties.getInstalledBy()).isEqualTo(configuration.getInstalledBy());
 		assertThat(properties.getPlaceholders()).isEqualTo(configuration.getPlaceholders());
 		assertThat(properties.getPlaceholderPrefix()).isEqualToIgnoringWhitespace(configuration.getPlaceholderPrefix());
@@ -68,10 +74,10 @@ class FlywayPropertiesTests {
 		assertThat(properties.isPlaceholderReplacement()).isEqualTo(configuration.isPlaceholderReplacement());
 		assertThat(properties.getSqlMigrationPrefix()).isEqualTo(configuration.getSqlMigrationPrefix());
 		assertThat(properties.getSqlMigrationSuffixes())
-				.isEqualTo(Arrays.asList(configuration.getSqlMigrationSuffixes()));
+			.isEqualTo(Arrays.asList(configuration.getSqlMigrationSuffixes()));
 		assertThat(properties.getSqlMigrationSeparator()).isEqualTo(properties.getSqlMigrationSeparator());
 		assertThat(properties.getRepeatableSqlMigrationPrefix())
-				.isEqualTo(properties.getRepeatableSqlMigrationPrefix());
+			.isEqualTo(properties.getRepeatableSqlMigrationPrefix());
 		assertThat(properties.getTarget()).isNull();
 		assertThat(configuration.getTarget()).isNull();
 		assertThat(configuration.getInitSql()).isNull();
@@ -90,6 +96,9 @@ class FlywayPropertiesTests {
 		assertThat(configuration.isSkipDefaultResolvers()).isEqualTo(properties.isSkipDefaultResolvers());
 		assertThat(configuration.isValidateMigrationNaming()).isEqualTo(properties.isValidateMigrationNaming());
 		assertThat(configuration.isValidateOnMigrate()).isEqualTo(properties.isValidateOnMigrate());
+		assertThat(properties.getDetectEncoding()).isNull();
+		assertThat(configuration.getScriptPlaceholderPrefix()).isEqualTo("FP__");
+		assertThat(configuration.getScriptPlaceholderSuffix()).isEqualTo("__");
 	}
 
 	@Test
@@ -99,13 +108,14 @@ class FlywayPropertiesTests {
 		Map<String, PropertyDescriptor> configuration = indexProperties(
 				PropertyAccessorFactory.forBeanPropertyAccess(new ClassicConfiguration()));
 		// Properties specific settings
-		ignoreProperties(properties, "url", "user", "password", "enabled", "checkLocation", "createDataSource");
-
+		ignoreProperties(properties, "url", "driverClassName", "user", "password", "enabled");
+		// Property that moved to a separate SQL plugin
+		ignoreProperties(properties, "sqlServerKerberosLoginFile");
 		// High level object we can't set with properties
 		ignoreProperties(configuration, "callbacks", "classLoader", "dataSource", "javaMigrations",
 				"javaMigrationClassProvider", "resourceProvider", "resolvers");
 		// Properties we don't want to expose
-		ignoreProperties(configuration, "resolversAsClassNames", "callbacksAsClassNames");
+		ignoreProperties(configuration, "resolversAsClassNames", "callbacksAsClassNames", "loggers", "driver");
 		// Handled by the conversion service
 		ignoreProperties(configuration, "baselineVersionAsString", "encodingAsString", "locationsAsStrings",
 				"targetAsString");
@@ -118,6 +128,8 @@ class FlywayPropertiesTests {
 		ignoreProperties(configuration, "shouldCreateSchemas");
 		// Getters for the DataSource settings rather than actual properties
 		ignoreProperties(configuration, "password", "url", "user");
+		// Properties not exposed by Flyway
+		ignoreProperties(configuration, "failOnMissingTarget");
 		List<String> configurationKeys = new ArrayList<>(configuration.keySet());
 		Collections.sort(configurationKeys);
 		List<String> propertiesKeys = new ArrayList<>(properties.keySet());
@@ -128,7 +140,7 @@ class FlywayPropertiesTests {
 	private void ignoreProperties(Map<String, ?> index, String... propertyNames) {
 		for (String propertyName : propertyNames) {
 			assertThat(index.remove(propertyName)).describedAs("Property to ignore should be present " + propertyName)
-					.isNotNull();
+				.isNotNull();
 		}
 	}
 

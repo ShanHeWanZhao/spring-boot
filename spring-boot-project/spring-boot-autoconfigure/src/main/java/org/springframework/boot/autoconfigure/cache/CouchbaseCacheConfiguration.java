@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,27 +39,23 @@ import org.springframework.util.ObjectUtils;
  * Couchbase cache configuration.
  *
  * @author Stephane Nicoll
- * @since 1.4.0
- * @deprecated since 2.3.3 to be made package-private in 2.5 as this class is not intended
- * for public use.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ Cluster.class, CouchbaseClientFactory.class, CouchbaseCacheManager.class })
 @ConditionalOnMissingBean(CacheManager.class)
 @ConditionalOnSingleCandidate(CouchbaseClientFactory.class)
 @Conditional(CacheCondition.class)
-@Deprecated
-public class CouchbaseCacheConfiguration {
+class CouchbaseCacheConfiguration {
 
 	@Bean
-	public CouchbaseCacheManager cacheManager(CacheProperties cacheProperties, CacheManagerCustomizers customizers,
+	CouchbaseCacheManager cacheManager(CacheProperties cacheProperties, CacheManagerCustomizers customizers,
 			ObjectProvider<CouchbaseCacheManagerBuilderCustomizer> couchbaseCacheManagerBuilderCustomizers,
 			CouchbaseClientFactory clientFactory) {
 		List<String> cacheNames = cacheProperties.getCacheNames();
 		CouchbaseCacheManagerBuilder builder = CouchbaseCacheManager.builder(clientFactory);
 		Couchbase couchbase = cacheProperties.getCouchbase();
 		org.springframework.data.couchbase.cache.CouchbaseCacheConfiguration config = org.springframework.data.couchbase.cache.CouchbaseCacheConfiguration
-				.defaultCacheConfig();
+			.defaultCacheConfig();
 		if (couchbase.getExpiration() != null) {
 			config = config.entryExpiry(couchbase.getExpiration());
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,19 +22,20 @@ import org.testcontainers.utility.DockerImageName;
  * Create {@link DockerImageName} instances for services used in integration tests.
  *
  * @author Stephane Nicoll
- * @since 2.3.6
  */
 public final class DockerImageNames {
 
 	private static final String CASSANDRA_VERSION = "3.11.10";
 
-	private static final String COUCHBASE_VERSION = "6.5.1";
+	private static final String COUCHBASE_VERSION = "7.1.4";
 
 	private static final String MONGO_VERSION = "4.0.23";
 
 	private static final String NEO4J_VERSION = "4.0";
 
-	private static final String POSTGRESQL_VERSION = "9.6.21";
+	private static final String POSTGRESQL_VERSION = "14.0";
+
+	private static final String RABBIT_VERSION = "3.11-alpine";
 
 	private static final String REDIS_VERSION = "4.0.14";
 
@@ -52,8 +53,8 @@ public final class DockerImageNames {
 	}
 
 	/**
-	 * Return a {@link DockerImageName} suitable for running Cassandra.
-	 * @return a docker image name for running cassandra
+	 * Return a {@link DockerImageName} suitable for running Couchbase.
+	 * @return a docker image name for running couchbase
 	 */
 	public static DockerImageName couchbase() {
 		return DockerImageName.parse("couchbase/server").withTag(COUCHBASE_VERSION);
@@ -94,6 +95,14 @@ public final class DockerImageNames {
 	}
 
 	/**
+	 * Return a {@link DockerImageName} suitable for running RabbitMQ.
+	 * @return a docker image name for running RabbitMQ
+	 */
+	public static DockerImageName rabbit() {
+		return DockerImageName.parse("rabbitmq").withTag(RABBIT_VERSION);
+	}
+
+	/**
 	 * Return a {@link DockerImageName} suitable for running Redis.
 	 * @return a docker image name for running redis
 	 */
@@ -104,7 +113,6 @@ public final class DockerImageNames {
 	/**
 	 * Return a {@link DockerImageName} suitable for running a Docker registry.
 	 * @return a docker image name for running a registry
-	 * @since 2.4.0
 	 */
 	public static DockerImageName registry() {
 		return DockerImageName.parse("registry").withTag(REGISTRY_VERSION);

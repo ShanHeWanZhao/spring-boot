@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Optional;
+import org.gradle.util.GradleVersion;
 
 /**
  * The properties that are written into the {@code build-info.properties} file.
@@ -37,6 +38,8 @@ import org.gradle.api.tasks.Optional;
  */
 @SuppressWarnings("serial")
 public class BuildInfoProperties implements Serializable {
+
+	private static final GradleVersion GRADLE_7_4 = GradleVersion.version("7.4");
 
 	private transient Instant creationTime = Instant.now();
 
@@ -66,15 +69,18 @@ public class BuildInfoProperties implements Serializable {
 	}
 
 	private Provider<String> projectVersion(Project project) {
-		try {
-			Provider<String> externalVersionProperty = project.getProviders().gradleProperty("version")
-					.forUseAtConfigurationTime();
-			externalVersionProperty.getOrNull();
-		}
-		catch (NoSuchMethodError ex) {
-			// Gradle < 6.5
-		}
+		Provider<String> externalVersionProperty = forUseAtConfigurationTime(
+				project.getProviders().gradleProperty("version"));
+		externalVersionProperty.getOrNull();
 		return project.provider(() -> project.getVersion().toString());
+	}
+
+	@SuppressWarnings("deprecation")
+	private Provider<String> forUseAtConfigurationTime(Provider<String> provider) {
+		if (GradleVersion.current().compareTo(GRADLE_7_4) < 0) {
+			return provider.forUseAtConfigurationTime();
+		}
+		return provider;
 	}
 
 	/**

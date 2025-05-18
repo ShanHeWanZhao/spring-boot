@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,8 @@ import org.apache.maven.shared.invoker.InvocationResult;
 import org.apache.maven.shared.invoker.Invoker;
 import org.apache.maven.shared.invoker.MavenInvocationException;
 
+import org.springframework.util.FileSystemUtils;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.contentOf;
 
@@ -87,23 +89,11 @@ class MavenBuild {
 
 	private Map<String, String> getPomReplacements() {
 		Map<String, String> replacements = new HashMap<>();
-		SpringBootDependenciesBom bom = new SpringBootDependenciesBom();
 		replacements.put("java.version", "1.8");
 		replacements.put("project.groupId", "org.springframework.boot");
 		replacements.put("project.artifactId", "spring-boot-maven-plugin");
-		replacements.put("project.version", bom.get("version"));
-		putReplacement(replacements, bom, "log4j2.version");
-		putReplacement(replacements, bom, "maven-jar-plugin.version");
-		putReplacement(replacements, bom, "maven-war-plugin.version");
-		putReplacement(replacements, bom, "build-helper-maven-plugin.version");
-		putReplacement(replacements, bom, "spring-framework.version");
-		putReplacement(replacements, bom, "jakarta-servlet.version");
-		putReplacement(replacements, bom, "kotlin.version");
+		replacements.putAll(new Versions().asMap());
 		return Collections.unmodifiableMap(replacements);
-	}
-
-	private void putReplacement(Map<String, String> replacements, SpringBootDependenciesBom bom, String property) {
-		replacements.put(property, bom.get("properties/" + property));
 	}
 
 	MavenBuild project(String project) {
@@ -169,10 +159,8 @@ class MavenBuild {
 			});
 			String settingsXml = new String(Files.readAllBytes(Paths.get("src", "intTest", "projects", "settings.xml")),
 					StandardCharsets.UTF_8)
-							.replace("@localCentralUrl@",
-									new File("build/int-test-maven-repository").toURI().toURL().toString())
-							.replace("@localRepositoryPath@",
-									new File("build/local-maven-repository").getAbsolutePath());
+				.replace("@localCentralUrl@", new File("build/int-test-maven-repository").toURI().toURL().toString())
+				.replace("@localRepositoryPath@", new File("build/local-maven-repository").getAbsolutePath());
 			Files.write(destination.resolve("settings.xml"), settingsXml.getBytes(StandardCharsets.UTF_8),
 					StandardOpenOption.CREATE_NEW);
 			request.setBaseDirectory(this.temp);
@@ -206,6 +194,9 @@ class MavenBuild {
 		}
 		catch (Exception ex) {
 			throw new RuntimeException(ex);
+		}
+		finally {
+			FileSystemUtils.deleteRecursively(this.temp);
 		}
 	}
 

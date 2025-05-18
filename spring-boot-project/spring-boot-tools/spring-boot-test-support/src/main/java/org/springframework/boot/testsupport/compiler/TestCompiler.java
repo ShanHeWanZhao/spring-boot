@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import javax.tools.ToolProvider;
  * @author Stephane Nicoll
  * @author Phillip Webb
  * @author Andy Wilkinson
- * @since 1.5.0
  */
 public class TestCompiler {
 
@@ -63,6 +62,8 @@ public class TestCompiler {
 		Iterable<? extends File> temp = Collections.singletonList(this.outputLocation);
 		this.fileManager.setLocation(StandardLocation.CLASS_OUTPUT, temp);
 		this.fileManager.setLocation(StandardLocation.SOURCE_OUTPUT, temp);
+		Iterable<? extends File> classPath = this.fileManager.getLocation(StandardLocation.CLASS_PATH);
+		this.fileManager.setLocation(StandardLocation.CLASS_PATH, prepareClassPath(classPath));
 	}
 
 	public TestCompilationTask getTask(Collection<File> sourceFiles) {
@@ -102,6 +103,10 @@ public class TestCompiler {
 
 	protected File getSourceDirectory() {
 		return SOURCE_DIRECTORY;
+	}
+
+	protected Iterable<? extends File> prepareClassPath(Iterable<? extends File> classPath) {
+		return classPath;
 	}
 
 	/**

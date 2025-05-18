@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ class JavaLoggingSystemTests extends AbstractLoggingSystemTests {
 	private Locale defaultLocale;
 
 	@BeforeEach
-	void init() throws SecurityException {
+	void init() {
 		this.logger = Logger.getLogger(getClass().getName());
 		this.defaultLocale = Locale.getDefault();
 		Locale.setDefault(Locale.ENGLISH);
@@ -133,8 +133,8 @@ class JavaLoggingSystemTests extends AbstractLoggingSystemTests {
 	@Test
 	void testNonexistentConfigLocation() {
 		this.loggingSystem.beforeInitialize();
-		assertThatIllegalStateException().isThrownBy(
-				() -> this.loggingSystem.initialize(null, "classpath:logging-nonexistent.properties", null));
+		assertThatIllegalStateException()
+			.isThrownBy(() -> this.loggingSystem.initialize(null, "classpath:logging-nonexistent.properties", null));
 	}
 
 	@Test
@@ -166,7 +166,7 @@ class JavaLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	@Test
-	void getLoggingConfigurations() {
+	void getLoggerConfigurations() {
 		this.loggingSystem.beforeInitialize();
 		this.loggingSystem.initialize(null, null, null);
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
@@ -176,13 +176,13 @@ class JavaLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	@Test
-	void getLoggingConfiguration() {
+	void getLoggerConfiguration() {
 		this.loggingSystem.beforeInitialize();
 		this.loggingSystem.initialize(null, null, null);
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration(getClass().getName());
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
+			.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
 	}
 
 }

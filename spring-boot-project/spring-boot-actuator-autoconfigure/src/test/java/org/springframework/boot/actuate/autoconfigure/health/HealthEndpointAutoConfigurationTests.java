@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,18 @@
 package org.springframework.boot.actuate.autoconfigure.health;
 
 import java.util.Collections;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointAutoConfiguration;
+import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.boot.actuate.endpoint.SecurityContext;
-import org.springframework.boot.actuate.endpoint.http.ApiVersion;
 import org.springframework.boot.actuate.endpoint.web.WebEndpointResponse;
+import org.springframework.boot.actuate.endpoint.web.WebServerNamespace;
 import org.springframework.boot.actuate.health.DefaultHealthContributorRegistry;
 import org.springframework.boot.actuate.health.DefaultReactiveHealthContributorRegistry;
 import org.springframework.boot.actuate.health.Health;
@@ -42,8 +46,10 @@ import org.springframework.boot.actuate.health.ReactiveHealthEndpointWebExtensio
 import org.springframework.boot.actuate.health.ReactiveHealthIndicator;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.actuate.health.StatusAggregator;
+import org.springframework.boot.actuate.health.SystemHealth;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.FilteredClassLoader;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
 import org.springframework.boot.test.context.runner.WebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -65,12 +71,15 @@ import static org.mockito.Mockito.mock;
 class HealthEndpointAutoConfigurationTests {
 
 	private final WebApplicationContextRunner contextRunner = new WebApplicationContextRunner()
-			.withUserConfiguration(HealthIndicatorsConfiguration.class).withConfiguration(AutoConfigurations
-					.of(HealthContributorAutoConfiguration.class, HealthEndpointAutoConfiguration.class));
+		.withUserConfiguration(HealthIndicatorsConfiguration.class)
+		.withConfiguration(
+				AutoConfigurations.of(HealthContributorAutoConfiguration.class, HealthEndpointAutoConfiguration.class));
 
 	private final ReactiveWebApplicationContextRunner reactiveContextRunner = new ReactiveWebApplicationContextRunner()
-			.withUserConfiguration(HealthIndicatorsConfiguration.class).withConfiguration(AutoConfigurations
-					.of(HealthContributorAutoConfiguration.class, HealthEndpointAutoConfiguration.class));
+		.withUserConfiguration(HealthIndicatorsConfiguration.class)
+		.withConfiguration(
+				AutoConfigurations.of(HealthContributorAutoConfiguration.class, HealthEndpointAutoConfiguration.class,
+						WebEndpointAutoConfiguration.class, EndpointAutoConfiguration.class));
 
 	@Test
 	void runWhenHealthEndpointIsDisabledDoesNotCreateBeans() {
@@ -97,28 +106,30 @@ class HealthEndpointAutoConfigurationTests {
 	@Test
 	void runWhenHasStatusAggregatorBeanIgnoresProperties() {
 		this.contextRunner.withUserConfiguration(StatusAggregatorConfiguration.class)
-				.withPropertyValues("management.endpoint.health.status.order=up,down").run((context) -> {
-					StatusAggregator aggregator = context.getBean(StatusAggregator.class);
-					assertThat(aggregator.getAggregateStatus(Status.UP, Status.DOWN)).isEqualTo(Status.UNKNOWN);
-				});
+			.withPropertyValues("management.endpoint.health.status.order=up,down")
+			.run((context) -> {
+				StatusAggregator aggregator = context.getBean(StatusAggregator.class);
+				assertThat(aggregator.getAggregateStatus(Status.UP, Status.DOWN)).isEqualTo(Status.UNKNOWN);
+			});
 	}
 
 	@Test
 	void runCreatesHttpCodeStatusMapperFromProperties() {
 		this.contextRunner.withPropertyValues("management.endpoint.health.status.http-mapping.up=123")
-				.run((context) -> {
-					HttpCodeStatusMapper mapper = context.getBean(HttpCodeStatusMapper.class);
-					assertThat(mapper.getStatusCode(Status.UP)).isEqualTo(123);
-				});
+			.run((context) -> {
+				HttpCodeStatusMapper mapper = context.getBean(HttpCodeStatusMapper.class);
+				assertThat(mapper.getStatusCode(Status.UP)).isEqualTo(123);
+			});
 	}
 
 	@Test
 	void runWhenHasHttpCodeStatusMapperBeanIgnoresProperties() {
 		this.contextRunner.withUserConfiguration(HttpCodeStatusMapperConfiguration.class)
-				.withPropertyValues("management.health.status.http-mapping.up=123").run((context) -> {
-					HttpCodeStatusMapper mapper = context.getBean(HttpCodeStatusMapper.class);
-					assertThat(mapper.getStatusCode(Status.UP)).isEqualTo(456);
-				});
+			.withPropertyValues("management.endpoint.health.status.http-mapping.up=123")
+			.run((context) -> {
+				HttpCodeStatusMapper mapper = context.getBean(HttpCodeStatusMapper.class);
+				assertThat(mapper.getStatusCode(Status.UP)).isEqualTo(456);
+			});
 	}
 
 	@Test
@@ -133,10 +144,11 @@ class HealthEndpointAutoConfigurationTests {
 	@Test
 	void runWhenHasHealthEndpointGroupsBeanDoesNotCreateAdditionalHealthEndpointGroups() {
 		this.contextRunner.withUserConfiguration(HealthEndpointGroupsConfiguration.class)
-				.withPropertyValues("management.endpoint.health.group.ready.include=*").run((context) -> {
-					HealthEndpointGroups groups = context.getBean(HealthEndpointGroups.class);
-					assertThat(groups.getNames()).containsOnly("mock");
-				});
+			.withPropertyValues("management.endpoint.health.group.ready.include=*")
+			.run((context) -> {
+				HealthEndpointGroups groups = context.getBean(HealthEndpointGroups.class);
+				assertThat(groups.getNames()).containsOnly("mock");
+			});
 	}
 
 	@Test
@@ -196,20 +208,19 @@ class HealthEndpointAutoConfigurationTests {
 	@Test
 	void runWhenHasReactiveHealthContributorRegistryBeanDoesNotCreateAdditionalReactiveHealthContributorRegistry() {
 		this.reactiveContextRunner.withUserConfiguration(ReactiveHealthContributorRegistryConfiguration.class)
-				.run((context) -> {
-					ReactiveHealthContributorRegistry registry = context
-							.getBean(ReactiveHealthContributorRegistry.class);
-					Object[] names = registry.stream().map(NamedContributor::getName).toArray();
-					assertThat(names).isEmpty();
-				});
+			.run((context) -> {
+				ReactiveHealthContributorRegistry registry = context.getBean(ReactiveHealthContributorRegistry.class);
+				Object[] names = registry.stream().map(NamedContributor::getName).toArray();
+				assertThat(names).isEmpty();
+			});
 	}
 
 	@Test
 	void runCreatesHealthEndpointWebExtension() {
 		this.contextRunner.run((context) -> {
 			HealthEndpointWebExtension webExtension = context.getBean(HealthEndpointWebExtension.class);
-			WebEndpointResponse<HealthComponent> response = webExtension.health(ApiVersion.V3, SecurityContext.NONE,
-					true, "simple");
+			WebEndpointResponse<HealthComponent> response = webExtension.health(ApiVersion.V3,
+					WebServerNamespace.SERVER, SecurityContext.NONE, true, "simple");
 			Health health = (Health) response.getBody();
 			assertThat(response.getStatus()).isEqualTo(200);
 			assertThat(health.getDetails()).containsEntry("counter", 42);
@@ -220,8 +231,8 @@ class HealthEndpointAutoConfigurationTests {
 	void runWhenHasHealthEndpointWebExtensionBeanDoesNotCreateExtraHealthEndpointWebExtension() {
 		this.contextRunner.withUserConfiguration(HealthEndpointWebExtensionConfiguration.class).run((context) -> {
 			HealthEndpointWebExtension webExtension = context.getBean(HealthEndpointWebExtension.class);
-			WebEndpointResponse<HealthComponent> response = webExtension.health(ApiVersion.V3, SecurityContext.NONE,
-					true, "simple");
+			WebEndpointResponse<HealthComponent> response = webExtension.health(ApiVersion.V3,
+					WebServerNamespace.SERVER, SecurityContext.NONE, true, "simple");
 			assertThat(response).isNull();
 		});
 	}
@@ -231,7 +242,7 @@ class HealthEndpointAutoConfigurationTests {
 		this.reactiveContextRunner.run((context) -> {
 			ReactiveHealthEndpointWebExtension webExtension = context.getBean(ReactiveHealthEndpointWebExtension.class);
 			Mono<WebEndpointResponse<? extends HealthComponent>> response = webExtension.health(ApiVersion.V3,
-					SecurityContext.NONE, true, "simple");
+					WebServerNamespace.SERVER, SecurityContext.NONE, true, "simple");
 			Health health = (Health) (response.block().getBody());
 			assertThat(health.getDetails()).containsEntry("counter", 42);
 		});
@@ -240,23 +251,53 @@ class HealthEndpointAutoConfigurationTests {
 	@Test
 	void runWhenHasReactiveHealthEndpointWebExtensionBeanDoesNotCreateExtraReactiveHealthEndpointWebExtension() {
 		this.reactiveContextRunner.withUserConfiguration(ReactiveHealthEndpointWebExtensionConfiguration.class)
-				.run((context) -> {
-					ReactiveHealthEndpointWebExtension webExtension = context
-							.getBean(ReactiveHealthEndpointWebExtension.class);
-					Mono<WebEndpointResponse<? extends HealthComponent>> response = webExtension.health(ApiVersion.V3,
-							SecurityContext.NONE, true, "simple");
-					assertThat(response).isNull();
-				});
+			.run((context) -> {
+				ReactiveHealthEndpointWebExtension webExtension = context
+					.getBean(ReactiveHealthEndpointWebExtension.class);
+				Mono<WebEndpointResponse<? extends HealthComponent>> response = webExtension.health(ApiVersion.V3,
+						WebServerNamespace.SERVER, SecurityContext.NONE, true, "simple");
+				assertThat(response).isNull();
+			});
 	}
 
 	@Test
 	void runWhenHasHealthEndpointGroupsPostProcessorPerformsProcessing() {
-		this.contextRunner.withPropertyValues("management.endpoint.health.group.ready.include=*").withUserConfiguration(
-				HealthEndpointGroupsConfiguration.class, TestHealthEndpointGroupsPostProcessor.class).run((context) -> {
-					HealthEndpointGroups groups = context.getBean(HealthEndpointGroups.class);
-					assertThatExceptionOfType(RuntimeException.class).isThrownBy(() -> groups.get("test"))
-							.withMessage("postprocessed");
-				});
+		this.contextRunner.withPropertyValues("management.endpoint.health.group.ready.include=*")
+			.withUserConfiguration(HealthEndpointGroupsConfiguration.class, TestHealthEndpointGroupsPostProcessor.class)
+			.run((context) -> {
+				HealthEndpointGroups groups = context.getBean(HealthEndpointGroups.class);
+				assertThatExceptionOfType(RuntimeException.class).isThrownBy(() -> groups.get("test"))
+					.withMessage("postprocessed");
+			});
+	}
+
+	@Test
+	void runWithIndicatorsInParentContextFindsIndicators() {
+		new ApplicationContextRunner().withUserConfiguration(HealthIndicatorsConfiguration.class)
+			.run((parent) -> new WebApplicationContextRunner()
+				.withConfiguration(AutoConfigurations.of(HealthContributorAutoConfiguration.class,
+						HealthEndpointAutoConfiguration.class))
+				.withParent(parent)
+				.run((context) -> {
+					HealthComponent health = context.getBean(HealthEndpoint.class).health();
+					Map<String, HealthComponent> components = ((SystemHealth) health).getComponents();
+					assertThat(components).containsKeys("additional", "ping", "simple");
+				}));
+	}
+
+	@Test
+	void runWithReactiveContextAndIndicatorsInParentContextFindsIndicators() {
+		new ApplicationContextRunner().withUserConfiguration(HealthIndicatorsConfiguration.class)
+			.run((parent) -> new ReactiveWebApplicationContextRunner()
+				.withConfiguration(AutoConfigurations.of(HealthContributorAutoConfiguration.class,
+						HealthEndpointAutoConfiguration.class, WebEndpointAutoConfiguration.class,
+						EndpointAutoConfiguration.class))
+				.withParent(parent)
+				.run((context) -> {
+					HealthComponent health = context.getBean(HealthEndpoint.class).health();
+					Map<String, HealthComponent> components = ((SystemHealth) health).getComponents();
+					assertThat(components).containsKeys("additional", "ping", "simple");
+				}));
 	}
 
 	@Configuration(proxyBeanMethods = false)

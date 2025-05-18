@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,19 +18,22 @@ package org.springframework.boot.autoconfigure.quartz;
 
 import javax.sql.DataSource;
 
-import org.springframework.boot.jdbc.AbstractDataSourceInitializer;
-import org.springframework.boot.jdbc.DataSourceInitializationMode;
+import org.springframework.boot.sql.init.DatabaseInitializationMode;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /**
  * Initialize the Quartz Scheduler schema.
  *
  * @author Vedran Pavic
  * @since 2.0.0
+ * @deprecated since 2.6.0 for removal in 3.0.0 in favor of
+ * {@link QuartzDataSourceScriptDatabaseInitializer}
  */
-public class QuartzDataSourceInitializer extends AbstractDataSourceInitializer {
+@Deprecated
+public class QuartzDataSourceInitializer extends org.springframework.boot.jdbc.AbstractDataSourceInitializer {
 
 	private final QuartzProperties properties;
 
@@ -47,8 +50,17 @@ public class QuartzDataSourceInitializer extends AbstractDataSourceInitializer {
 	}
 
 	@Override
-	protected DataSourceInitializationMode getMode() {
-		return this.properties.getJdbc().getInitializeSchema();
+	protected org.springframework.boot.jdbc.DataSourceInitializationMode getMode() {
+		DatabaseInitializationMode mode = this.properties.getJdbc().getInitializeSchema();
+		switch (mode) {
+			case ALWAYS:
+				return org.springframework.boot.jdbc.DataSourceInitializationMode.ALWAYS;
+			case EMBEDDED:
+				return org.springframework.boot.jdbc.DataSourceInitializationMode.EMBEDDED;
+			case NEVER:
+			default:
+				return org.springframework.boot.jdbc.DataSourceInitializationMode.NEVER;
+		}
 	}
 
 	@Override
@@ -58,11 +70,15 @@ public class QuartzDataSourceInitializer extends AbstractDataSourceInitializer {
 
 	@Override
 	protected String getDatabaseName() {
+		String platform = this.properties.getJdbc().getPlatform();
+		if (StringUtils.hasText(platform)) {
+			return platform;
+		}
 		String databaseName = super.getDatabaseName();
 		if ("db2".equals(databaseName)) {
 			return "db2_v95";
 		}
-		if ("mysql".equals(databaseName)) {
+		if ("mysql".equals(databaseName) || "mariadb".equals(databaseName)) {
 			return "mysql_innodb";
 		}
 		if ("postgresql".equals(databaseName)) {

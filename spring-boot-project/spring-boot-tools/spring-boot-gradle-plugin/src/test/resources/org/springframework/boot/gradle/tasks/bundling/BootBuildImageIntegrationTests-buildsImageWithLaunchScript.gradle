@@ -1,0 +1,14 @@
+import org.gradle.util.GradleVersion
+
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '{version}'
+}
+
+bootJar {
+	launchScript()
+}
+
+bootBuildImage {
+	builder = "projects.registry.vmware.com/springboot/spring-boot-cnb-builder:0.0.1"
+}

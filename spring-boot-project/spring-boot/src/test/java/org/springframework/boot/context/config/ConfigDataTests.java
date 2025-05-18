@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,13 +45,13 @@ class ConfigDataTests {
 	@Test
 	void createWhenPropertySourcesIsNullThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new ConfigData(null))
-				.withMessage("PropertySources must not be null");
+			.withMessage("PropertySources must not be null");
 	}
 
 	@Test
 	void createWhenOptionsIsNullThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new ConfigData(Collections.emptyList(), (Option[]) null))
-				.withMessage("Options must not be null");
+			.withMessage("Options must not be null");
 	}
 
 	@Test
@@ -75,12 +75,13 @@ class ConfigDataTests {
 
 	@Test
 	@Deprecated
+	@SuppressWarnings("deprecation")
 	void getDeprecatedOptionsWhenUsingPropertySourceOptionsThrowsException() {
 		MapPropertySource source = new MapPropertySource("test", Collections.emptyMap());
 		PropertySourceOptions propertySourceOptions = (propertySource) -> Options.NONE;
 		ConfigData configData = new ConfigData(Collections.singleton(source), propertySourceOptions);
 		assertThatIllegalStateException().isThrownBy(() -> configData.getOptions())
-				.withMessage("No global options defined");
+			.withMessage("No global options defined");
 	}
 
 	@Test
@@ -127,6 +128,22 @@ class ConfigDataTests {
 	@Test
 	void optionsNoneReturnsEmptyOptions() {
 		assertThat(Options.NONE.asSet()).isEmpty();
+	}
+
+	@Test
+	void optionsWithoutReturnsNewOptions() {
+		Options options = Options.of(Option.IGNORE_IMPORTS, Option.IGNORE_PROFILES);
+		Options without = options.without(Option.IGNORE_PROFILES);
+		assertThat(options.asSet()).containsExactly(Option.IGNORE_IMPORTS, Option.IGNORE_PROFILES);
+		assertThat(without.asSet()).containsExactly(Option.IGNORE_IMPORTS);
+	}
+
+	@Test
+	void optionsWithReturnsNewOptions() {
+		Options options = Options.of(Option.IGNORE_IMPORTS);
+		Options with = options.with(Option.IGNORE_PROFILES);
+		assertThat(options.asSet()).containsExactly(Option.IGNORE_IMPORTS);
+		assertThat(with.asSet()).containsExactly(Option.IGNORE_IMPORTS, Option.IGNORE_PROFILES);
 	}
 
 	@Test

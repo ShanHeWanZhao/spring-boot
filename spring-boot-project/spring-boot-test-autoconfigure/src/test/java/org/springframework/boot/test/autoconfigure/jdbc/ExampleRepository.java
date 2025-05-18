@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,26 +32,26 @@ import org.springframework.stereotype.Repository;
  * @author Stephane Nicoll
  */
 @Repository
-public class ExampleRepository {
+class ExampleRepository {
 
 	private static final ExampleEntityRowMapper ROW_MAPPER = new ExampleEntityRowMapper();
 
 	private final JdbcTemplate jdbcTemplate;
 
-	public ExampleRepository(JdbcTemplate jdbcTemplate) {
+	ExampleRepository(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
 	}
 
 	@Transactional
-	public void save(ExampleEntity entity) {
+	void save(ExampleEntity entity) {
 		this.jdbcTemplate.update("insert into example (id, name) values (?, ?)", entity.getId(), entity.getName());
 	}
 
-	public ExampleEntity findById(int id) {
+	ExampleEntity findById(int id) {
 		return this.jdbcTemplate.queryForObject("select id, name from example where id =?", ROW_MAPPER, id);
 	}
 
-	public Collection<ExampleEntity> findAll() {
+	Collection<ExampleEntity> findAll() {
 		return this.jdbcTemplate.query("select id, name from example", ROW_MAPPER);
 	}
 

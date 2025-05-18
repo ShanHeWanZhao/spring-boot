@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,34 +17,33 @@
 package org.springframework.boot.autoconfigure.mongo.embedded;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
-import java.util.EnumSet;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import de.flapdoodle.embed.mongo.MongodExecutable;
 import de.flapdoodle.embed.mongo.MongodStarter;
-import de.flapdoodle.embed.mongo.config.IMongodConfig;
+import de.flapdoodle.embed.mongo.config.MongodConfig;
 import de.flapdoodle.embed.mongo.config.Storage;
-import de.flapdoodle.embed.mongo.distribution.Feature;
 import de.flapdoodle.embed.mongo.distribution.Version;
-import de.flapdoodle.embed.process.config.IRuntimeConfig;
-import de.flapdoodle.embed.process.config.store.IDownloadConfig;
+import de.flapdoodle.embed.process.config.RuntimeConfig;
+import de.flapdoodle.embed.process.config.store.DownloadConfig;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.springframework.beans.DirectFieldAccessor;
+import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
 import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.boot.testsupport.junit.DisabledOnOs;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -53,6 +52,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.util.FileSystemUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Tests for {@link EmbeddedMongoAutoConfiguration}.
@@ -61,7 +61,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Andy Wilkinson
  * @author Stephane Nicoll
  * @author Issam El-atif
+ * @author Chris Bono
  */
+
+@DisabledOnOs(os = OS.LINUX, architecture = "aarch64",
+		disabledReason = "Embedded Mongo doesn't support Linux aarch64, see https://github.com/flapdoodle-oss/de.flapdoodle.embed.mongo/issues/379")
 class EmbeddedMongoAutoConfigurationTests {
 
 	private AnnotationConfigApplicationContext context;
@@ -74,8 +78,16 @@ class EmbeddedMongoAutoConfigurationTests {
 	}
 
 	@Test
-	void defaultVersion() {
-		assertVersionConfiguration(null, "3.5.5");
+	void noVersion() {
+		this.context = new AnnotationConfigApplicationContext();
+		TestPropertyValues.of("spring.data.mongodb.port=0").applyTo(this.context);
+		this.context.register(MongoAutoConfiguration.class, MongoDataAutoConfiguration.class,
+				EmbeddedMongoAutoConfiguration.class);
+		assertThatExceptionOfType(BeanCreationException.class).isThrownBy(() -> this.context.refresh())
+			.withRootCauseExactlyInstanceOf(IllegalStateException.class)
+			.havingRootCause()
+			.withMessage("Set the spring.mongodb.embedded.version property or define your own MongodConfig "
+					+ "bean to use embedded MongoDB");
 	}
 
 	@Test
@@ -90,21 +102,8 @@ class EmbeddedMongoAutoConfigurationTests {
 	}
 
 	@Test
-	void customFeatures() {
-		EnumSet<Feature> features = EnumSet.of(Feature.TEXT_SEARCH, Feature.SYNC_DELAY, Feature.ONLY_WITH_SSL,
-				Feature.NO_HTTP_INTERFACE_ARG);
-		if (isWindows()) {
-			features.add(Feature.ONLY_WINDOWS_2008_SERVER);
-		}
-		load("spring.mongodb.embedded.features="
-				+ features.stream().map(Feature::name).collect(Collectors.joining(", ")));
-		assertThat(this.context.getBean(EmbeddedMongoProperties.class).getFeatures())
-				.containsExactlyElementsOf(features);
-	}
-
-	@Test
 	void useRandomPortByDefault() {
-		load();
+		loadWithValidVersion();
 		assertThat(this.context.getBeansOfType(MongoClient.class)).hasSize(1);
 		MongoClient client = this.context.getBean(MongoClient.class);
 		Integer mongoPort = Integer.valueOf(this.context.getEnvironment().getProperty("local.mongo.port"));
@@ -113,7 +112,7 @@ class EmbeddedMongoAutoConfigurationTests {
 
 	@Test
 	void specifyPortToZeroAllocateRandomPort() {
-		load("spring.data.mongodb.port=0");
+		loadWithValidVersion("spring.data.mongodb.port=0");
 		assertThat(this.context.getBeansOfType(MongoClient.class)).hasSize(1);
 		MongoClient client = this.context.getBean(MongoClient.class);
 		Integer mongoPort = Integer.valueOf(this.context.getEnvironment().getProperty("local.mongo.port"));
@@ -122,7 +121,7 @@ class EmbeddedMongoAutoConfigurationTests {
 
 	@Test
 	void randomlyAllocatedPortIsAvailableWhenCreatingMongoClient() {
-		load(MongoClientConfiguration.class);
+		loadWithValidVersion(MongoClientConfiguration.class);
 		MongoClient client = this.context.getBean(MongoClient.class);
 		Integer mongoPort = Integer.valueOf(this.context.getEnvironment().getProperty("local.mongo.port"));
 		assertThat(getPort(client)).isEqualTo(mongoPort);
@@ -131,6 +130,7 @@ class EmbeddedMongoAutoConfigurationTests {
 	@Test
 	void portIsAvailableInParentContext() {
 		try (ConfigurableApplicationContext parent = new AnnotationConfigApplicationContext()) {
+			TestPropertyValues.of("spring.mongodb.embedded.version=3.5.5").applyTo(parent);
 			parent.refresh();
 			this.context = new AnnotationConfigApplicationContext();
 			this.context.setParent(parent);
@@ -142,58 +142,58 @@ class EmbeddedMongoAutoConfigurationTests {
 
 	@Test
 	void defaultStorageConfiguration() {
-		load(MongoClientConfiguration.class);
-		Storage replication = this.context.getBean(IMongodConfig.class).replication();
+		loadWithValidVersion(MongoClientConfiguration.class);
+		Storage replication = this.context.getBean(MongodConfig.class).replication();
 		assertThat(replication.getOplogSize()).isEqualTo(0);
 		assertThat(replication.getDatabaseDir()).isNull();
 		assertThat(replication.getReplSetName()).isNull();
 	}
 
 	@Test
-	void mongoWritesToCustomDatabaseDir(@TempDir Path temp) throws IOException {
+	void mongoWritesToCustomDatabaseDir(@TempDir Path temp) {
 		File customDatabaseDir = new File(temp.toFile(), "custom-database-dir");
 		FileSystemUtils.deleteRecursively(customDatabaseDir);
-		load("spring.mongodb.embedded.storage.databaseDir=" + customDatabaseDir.getPath());
+		loadWithValidVersion("spring.mongodb.embedded.storage.databaseDir=" + customDatabaseDir.getPath());
 		assertThat(customDatabaseDir).isDirectory();
 		assertThat(customDatabaseDir.listFiles()).isNotEmpty();
 	}
 
 	@Test
 	void customOpLogSizeIsAppliedToConfiguration() {
-		load("spring.mongodb.embedded.storage.oplogSize=1024KB");
-		assertThat(this.context.getBean(IMongodConfig.class).replication().getOplogSize()).isEqualTo(1);
+		loadWithValidVersion("spring.mongodb.embedded.storage.oplogSize=1024KB");
+		assertThat(this.context.getBean(MongodConfig.class).replication().getOplogSize()).isEqualTo(1);
 	}
 
 	@Test
 	void customOpLogSizeUsesMegabytesPerDefault() {
-		load("spring.mongodb.embedded.storage.oplogSize=10");
-		assertThat(this.context.getBean(IMongodConfig.class).replication().getOplogSize()).isEqualTo(10);
+		loadWithValidVersion("spring.mongodb.embedded.storage.oplogSize=10");
+		assertThat(this.context.getBean(MongodConfig.class).replication().getOplogSize()).isEqualTo(10);
 	}
 
 	@Test
 	void customReplicaSetNameIsAppliedToConfiguration() {
-		load("spring.mongodb.embedded.storage.replSetName=testing");
-		assertThat(this.context.getBean(IMongodConfig.class).replication().getReplSetName()).isEqualTo("testing");
+		loadWithValidVersion("spring.mongodb.embedded.storage.replSetName=testing");
+		assertThat(this.context.getBean(MongodConfig.class).replication().getReplSetName()).isEqualTo("testing");
 	}
 
 	@Test
 	void customizeDownloadConfiguration() {
-		load(DownloadConfigBuilderCustomizerConfiguration.class);
-		IRuntimeConfig runtimeConfig = this.context.getBean(IRuntimeConfig.class);
-		IDownloadConfig downloadConfig = (IDownloadConfig) new DirectFieldAccessor(runtimeConfig.getArtifactStore())
-				.getPropertyValue("downloadConfig");
+		loadWithValidVersion(DownloadConfigBuilderCustomizerConfiguration.class);
+		RuntimeConfig runtimeConfig = this.context.getBean(RuntimeConfig.class);
+		DownloadConfig downloadConfig = (DownloadConfig) new DirectFieldAccessor(runtimeConfig.artifactStore())
+			.getPropertyValue("downloadConfig");
 		assertThat(downloadConfig.getUserAgent()).isEqualTo("Test User Agent");
 	}
 
 	@Test
 	void shutdownHookIsNotRegistered() {
-		load();
+		loadWithValidVersion();
 		assertThat(this.context.getBean(MongodExecutable.class).isRegisteredJobKiller()).isFalse();
 	}
 
 	@Test
 	void customMongoServerConfiguration() {
-		load(CustomMongoConfiguration.class);
+		loadWithValidVersion(CustomMongoConfiguration.class);
 		Map<String, MongoClient> mongoClients = this.context.getBeansOfType(MongoClient.class);
 		assertThat(mongoClients).isNotEmpty();
 		for (String mongoClientBeanName : mongoClients.keySet()) {
@@ -217,24 +217,21 @@ class EmbeddedMongoAutoConfigurationTests {
 		assertThat(buildInfo.getString("version")).isEqualTo(expectedVersion);
 	}
 
-	private void load(String... environment) {
-		load(null, environment);
+	private void loadWithValidVersion(String... environment) {
+		loadWithValidVersion(null, environment);
 	}
 
-	private void load(Class<?> config, String... environment) {
+	private void loadWithValidVersion(Class<?> config, String... environment) {
 		AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
 		if (config != null) {
 			ctx.register(config);
 		}
+		TestPropertyValues.of("spring.mongodb.embedded.version=3.5.5").applyTo(ctx);
 		TestPropertyValues.of(environment).applyTo(ctx);
 		ctx.register(EmbeddedMongoAutoConfiguration.class, MongoAutoConfiguration.class,
 				PropertyPlaceholderAutoConfiguration.class);
 		ctx.refresh();
 		this.context = ctx;
-	}
-
-	private boolean isWindows() {
-		return File.separatorChar == '\\';
 	}
 
 	private int getPort(MongoClient client) {
@@ -265,7 +262,7 @@ class EmbeddedMongoAutoConfigurationTests {
 	static class CustomMongoConfiguration {
 
 		@Bean(initMethod = "start", destroyMethod = "stop")
-		MongodExecutable customMongoServer(IRuntimeConfig runtimeConfig, IMongodConfig mongodConfig) {
+		MongodExecutable customMongoServer(RuntimeConfig runtimeConfig, MongodConfig mongodConfig) {
 			MongodStarter mongodStarter = MongodStarter.getInstance(runtimeConfig);
 			return mongodStarter.prepare(mongodConfig);
 		}

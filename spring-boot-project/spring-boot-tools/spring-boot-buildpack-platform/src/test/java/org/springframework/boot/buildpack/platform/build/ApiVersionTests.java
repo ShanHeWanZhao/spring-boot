@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 package org.springframework.boot.buildpack.platform.build;
+
+import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,19 +35,19 @@ class ApiVersionTests {
 	@Test
 	void parseWhenVersionIsNullThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> ApiVersion.parse(null))
-				.withMessage("Value must not be empty");
+			.withMessage("Value must not be empty");
 	}
 
 	@Test
 	void parseWhenVersionIsEmptyThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> ApiVersion.parse(""))
-				.withMessage("Value must not be empty");
+			.withMessage("Value must not be empty");
 	}
 
 	@Test
 	void parseWhenVersionDoesNotMatchPatternThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> ApiVersion.parse("bad"))
-				.withMessage("Malformed version number 'bad'");
+			.withMessage("Malformed version number 'bad'");
 	}
 
 	@Test
@@ -63,12 +65,12 @@ class ApiVersionTests {
 	@Test
 	void assertSupportsWhenDoesNotSupportThrowsException() {
 		assertThatIllegalStateException()
-				.isThrownBy(() -> ApiVersion.parse("1.2").assertSupports(ApiVersion.parse("1.3")))
-				.withMessage("Detected platform API version '1.3' does not match supported version '1.2'");
+			.isThrownBy(() -> ApiVersion.parse("1.2").assertSupports(ApiVersion.parse("1.3")))
+			.withMessage("Detected platform API version '1.3' does not match supported version '1.2'");
 	}
 
 	@Test
-	void supportWhenSame() {
+	void supportsWhenSame() {
 		assertThat(supports("0.0", "0.0")).isTrue();
 		assertThat(supports("0.1", "0.1")).isTrue();
 		assertThat(supports("1.0", "1.0")).isTrue();
@@ -92,9 +94,19 @@ class ApiVersionTests {
 	}
 
 	@Test
-	void supportWhenMajorZeroAndDifferentMinor() {
+	void supportsWhenMajorZeroAndDifferentMinor() {
 		assertThat(supports("0.2", "0.1")).isFalse();
 		assertThat(supports("0.2", "0.3")).isFalse();
+	}
+
+	@Test
+	void supportsAnyWhenOneMatches() {
+		assertThat(supportsAny("0.2", "0.1", "0.2")).isTrue();
+	}
+
+	@Test
+	void supportsAnyWhenNoneMatch() {
+		assertThat(supportsAny("0.2", "0.3", "0.4")).isFalse();
 	}
 
 	@Test
@@ -113,6 +125,11 @@ class ApiVersionTests {
 
 	private boolean supports(String v1, String v2) {
 		return ApiVersion.parse(v1).supports(ApiVersion.parse(v2));
+	}
+
+	private boolean supportsAny(String v1, String... others) {
+		return ApiVersion.parse(v1)
+			.supportsAny(Arrays.stream(others).map(ApiVersion::parse).toArray(ApiVersion[]::new));
 	}
 
 }

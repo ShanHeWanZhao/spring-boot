@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import javax.servlet.ServletRegistration;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureOrder;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
@@ -63,10 +63,9 @@ import org.springframework.web.servlet.DispatcherServlet;
  * @since 2.0.0
  */
 @AutoConfigureOrder(Ordered.HIGHEST_PRECEDENCE)
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(after = ServletWebServerFactoryAutoConfiguration.class)
 @ConditionalOnWebApplication(type = Type.SERVLET)
 @ConditionalOnClass(DispatcherServlet.class)
-@AutoConfigureAfter(ServletWebServerFactoryAutoConfiguration.class)
 public class DispatcherServletAutoConfiguration {
 
 	/**
@@ -135,21 +134,21 @@ public class DispatcherServletAutoConfiguration {
 			ConditionMessage.Builder message = ConditionMessage.forCondition("Default DispatcherServlet");
 			ConfigurableListableBeanFactory beanFactory = context.getBeanFactory();
 			List<String> dispatchServletBeans = Arrays
-					.asList(beanFactory.getBeanNamesForType(DispatcherServlet.class, false, false));
+				.asList(beanFactory.getBeanNamesForType(DispatcherServlet.class, false, false));
 			if (dispatchServletBeans.contains(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME)) {
 				return ConditionOutcome
-						.noMatch(message.found("dispatcher servlet bean").items(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
+					.noMatch(message.found("dispatcher servlet bean").items(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
 			}
 			if (beanFactory.containsBean(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME)) {
-				return ConditionOutcome.noMatch(
-						message.found("non dispatcher servlet bean").items(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
+				return ConditionOutcome
+					.noMatch(message.found("non dispatcher servlet bean").items(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
 			}
 			if (dispatchServletBeans.isEmpty()) {
 				return ConditionOutcome.match(message.didNotFind("dispatcher servlet beans").atAll());
 			}
 			return ConditionOutcome.match(message.found("dispatcher servlet bean", "dispatcher servlet beans")
-					.items(Style.QUOTE, dispatchServletBeans)
-					.append("and none is named " + DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
+				.items(Style.QUOTE, dispatchServletBeans)
+				.append("and none is named " + DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
 		}
 
 	}
@@ -173,7 +172,7 @@ public class DispatcherServletAutoConfiguration {
 				return ConditionOutcome.match();
 			}
 			List<String> servlets = Arrays
-					.asList(beanFactory.getBeanNamesForType(DispatcherServlet.class, false, false));
+				.asList(beanFactory.getBeanNamesForType(DispatcherServlet.class, false, false));
 			if (!servlets.contains(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME)) {
 				return ConditionOutcome.noMatch(
 						startMessage().found("non dispatcher servlet").items(DEFAULT_DISPATCHER_SERVLET_BEAN_NAME));
@@ -184,26 +183,27 @@ public class DispatcherServletAutoConfiguration {
 		private ConditionOutcome checkServletRegistration(ConfigurableListableBeanFactory beanFactory) {
 			ConditionMessage.Builder message = startMessage();
 			List<String> registrations = Arrays
-					.asList(beanFactory.getBeanNamesForType(ServletRegistrationBean.class, false, false));
+				.asList(beanFactory.getBeanNamesForType(ServletRegistrationBean.class, false, false));
 			boolean containsDispatcherRegistrationBean = beanFactory
-					.containsBean(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME);
+				.containsBean(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME);
 			if (registrations.isEmpty()) {
 				if (containsDispatcherRegistrationBean) {
 					return ConditionOutcome.noMatch(message.found("non servlet registration bean")
-							.items(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
+						.items(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
 				}
 				return ConditionOutcome.match(message.didNotFind("servlet registration bean").atAll());
 			}
 			if (registrations.contains(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME)) {
 				return ConditionOutcome.noMatch(message.found("servlet registration bean")
-						.items(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
+					.items(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
 			}
 			if (containsDispatcherRegistrationBean) {
 				return ConditionOutcome.noMatch(message.found("non servlet registration bean")
-						.items(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
+					.items(DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
 			}
-			return ConditionOutcome.match(message.found("servlet registration beans").items(Style.QUOTE, registrations)
-					.append("and none is named " + DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
+			return ConditionOutcome.match(message.found("servlet registration beans")
+				.items(Style.QUOTE, registrations)
+				.append("and none is named " + DEFAULT_DISPATCHER_SERVLET_REGISTRATION_BEAN_NAME));
 		}
 
 		private ConditionMessage.Builder startMessage() {

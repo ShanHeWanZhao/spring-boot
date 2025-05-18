@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,9 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.boot.context.properties.PropertyMapper;
+import org.springframework.boot.context.properties.source.MutuallyExclusiveConfigurationPropertiesException;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.core.io.Resource;
 import org.springframework.kafka.listener.ContainerProperties.AckMode;
@@ -52,6 +54,7 @@ import org.springframework.util.unit.DataSize;
  * @author Stephane Nicoll
  * @author Artem Bilan
  * @author Nakul Mishra
+ * @author Tomaz Fernandes
  * @since 1.5.0
  */
 @ConfigurationProperties(prefix = "spring.kafka")
@@ -91,6 +94,8 @@ public class KafkaProperties {
 	private final Template template = new Template();
 
 	private final Security security = new Security();
+
+	private final Retry retry = new Retry();
 
 	public List<String> getBootstrapServers() {
 		return this.bootstrapServers;
@@ -146,6 +151,10 @@ public class KafkaProperties {
 
 	public Security getSecurity() {
 		return this.security;
+	}
+
+	public Retry getRetry() {
+		return this.retry;
 	}
 
 	private Map<String, Object> buildCommonProperties() {
@@ -420,21 +429,25 @@ public class KafkaProperties {
 		public Map<String, Object> buildProperties() {
 			Properties properties = new Properties();
 			PropertyMapper map = PropertyMapper.get().alwaysApplyingWhenNonNull();
-			map.from(this::getAutoCommitInterval).asInt(Duration::toMillis)
-					.to(properties.in(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG));
+			map.from(this::getAutoCommitInterval)
+				.asInt(Duration::toMillis)
+				.to(properties.in(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG));
 			map.from(this::getAutoOffsetReset).to(properties.in(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG));
 			map.from(this::getBootstrapServers).to(properties.in(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG));
 			map.from(this::getClientId).to(properties.in(ConsumerConfig.CLIENT_ID_CONFIG));
 			map.from(this::getEnableAutoCommit).to(properties.in(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG));
-			map.from(this::getFetchMaxWait).asInt(Duration::toMillis)
-					.to(properties.in(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG));
-			map.from(this::getFetchMinSize).asInt(DataSize::toBytes)
-					.to(properties.in(ConsumerConfig.FETCH_MIN_BYTES_CONFIG));
+			map.from(this::getFetchMaxWait)
+				.asInt(Duration::toMillis)
+				.to(properties.in(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG));
+			map.from(this::getFetchMinSize)
+				.asInt(DataSize::toBytes)
+				.to(properties.in(ConsumerConfig.FETCH_MIN_BYTES_CONFIG));
 			map.from(this::getGroupId).to(properties.in(ConsumerConfig.GROUP_ID_CONFIG));
-			map.from(this::getHeartbeatInterval).asInt(Duration::toMillis)
-					.to(properties.in(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG));
+			map.from(this::getHeartbeatInterval)
+				.asInt(Duration::toMillis)
+				.to(properties.in(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG));
 			map.from(() -> getIsolationLevel().name().toLowerCase(Locale.ROOT))
-					.to(properties.in(ConsumerConfig.ISOLATION_LEVEL_CONFIG));
+				.to(properties.in(ConsumerConfig.ISOLATION_LEVEL_CONFIG));
 			map.from(this::getKeyDeserializer).to(properties.in(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG));
 			map.from(this::getValueDeserializer).to(properties.in(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG));
 			map.from(this::getMaxPollRecords).to(properties.in(ConsumerConfig.MAX_POLL_RECORDS_CONFIG));
@@ -606,8 +619,9 @@ public class KafkaProperties {
 			map.from(this::getAcks).to(properties.in(ProducerConfig.ACKS_CONFIG));
 			map.from(this::getBatchSize).asInt(DataSize::toBytes).to(properties.in(ProducerConfig.BATCH_SIZE_CONFIG));
 			map.from(this::getBootstrapServers).to(properties.in(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
-			map.from(this::getBufferMemory).as(DataSize::toBytes)
-					.to(properties.in(ProducerConfig.BUFFER_MEMORY_CONFIG));
+			map.from(this::getBufferMemory)
+				.as(DataSize::toBytes)
+				.to(properties.in(ProducerConfig.BUFFER_MEMORY_CONFIG));
 			map.from(this::getClientId).to(properties.in(ProducerConfig.CLIENT_ID_CONFIG));
 			map.from(this::getCompressionType).to(properties.in(ProducerConfig.COMPRESSION_TYPE_CONFIG));
 			map.from(this::getKeySerializer).to(properties.in(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG));
@@ -693,7 +707,7 @@ public class KafkaProperties {
 		private String applicationId;
 
 		/**
-		 * Whether or not to auto-start the streams factory bean.
+		 * Whether to auto-start the streams factory bean.
 		 */
 		private boolean autoStartup = true;
 
@@ -806,8 +820,9 @@ public class KafkaProperties {
 			PropertyMapper map = PropertyMapper.get().alwaysApplyingWhenNonNull();
 			map.from(this::getApplicationId).to(properties.in("application.id"));
 			map.from(this::getBootstrapServers).to(properties.in(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG));
-			map.from(this::getCacheMaxSizeBuffering).asInt(DataSize::toBytes)
-					.to(properties.in("cache.max.bytes.buffering"));
+			map.from(this::getCacheMaxSizeBuffering)
+				.asInt(DataSize::toBytes)
+				.to(properties.in("cache.max.bytes.buffering"));
 			map.from(this::getClientId).to(properties.in(CommonClientConfigs.CLIENT_ID_CONFIG));
 			map.from(this::getReplicationFactor).to(properties.in("replication.factor"));
 			map.from(this::getStateDir).to(properties.in("state.dir"));
@@ -823,12 +838,26 @@ public class KafkaProperties {
 		 */
 		private String defaultTopic;
 
+		/**
+		 * Transaction id prefix, override the transaction id prefix in the producer
+		 * factory.
+		 */
+		private String transactionIdPrefix;
+
 		public String getDefaultTopic() {
 			return this.defaultTopic;
 		}
 
 		public void setDefaultTopic(String defaultTopic) {
 			this.defaultTopic = defaultTopic;
+		}
+
+		public String getTransactionIdPrefix() {
+			return this.transactionIdPrefix;
+		}
+
+		public void setTransactionIdPrefix(String transactionIdPrefix) {
+			this.transactionIdPrefix = transactionIdPrefix;
 		}
 
 	}
@@ -902,6 +931,12 @@ public class KafkaProperties {
 		private Duration idleEventInterval;
 
 		/**
+		 * Time between publishing idle partition consumer events (no data received for
+		 * partition).
+		 */
+		private Duration idlePartitionEventInterval;
+
+		/**
 		 * Time between checks for non-responsive consumers. If a duration suffix is not
 		 * specified, seconds will be used.
 		 */
@@ -914,10 +949,22 @@ public class KafkaProperties {
 		private Boolean logContainerConfig;
 
 		/**
+		 * Whether to suppress the entire record from being written to the log when
+		 * retries are being attempted.
+		 */
+		private boolean onlyLogRecordMetadata = true;
+
+		/**
 		 * Whether the container should fail to start if at least one of the configured
 		 * topics are not present on the broker.
 		 */
 		private boolean missingTopicsFatal = false;
+
+		/**
+		 * Whether the container stops after the current record is processed or after all
+		 * the records from the previous poll are processed.
+		 */
+		private boolean immediateStop = false;
 
 		public Type getType() {
 			return this.type;
@@ -999,6 +1046,14 @@ public class KafkaProperties {
 			this.idleEventInterval = idleEventInterval;
 		}
 
+		public Duration getIdlePartitionEventInterval() {
+			return this.idlePartitionEventInterval;
+		}
+
+		public void setIdlePartitionEventInterval(Duration idlePartitionEventInterval) {
+			this.idlePartitionEventInterval = idlePartitionEventInterval;
+		}
+
 		public Duration getMonitorInterval() {
 			return this.monitorInterval;
 		}
@@ -1015,6 +1070,17 @@ public class KafkaProperties {
 			this.logContainerConfig = logContainerConfig;
 		}
 
+		@Deprecated
+		@DeprecatedConfigurationProperty(reason = "Use KafkaUtils#setConsumerRecordFormatter instead.")
+		public boolean isOnlyLogRecordMetadata() {
+			return this.onlyLogRecordMetadata;
+		}
+
+		@Deprecated
+		public void setOnlyLogRecordMetadata(boolean onlyLogRecordMetadata) {
+			this.onlyLogRecordMetadata = onlyLogRecordMetadata;
+		}
+
 		public boolean isMissingTopicsFatal() {
 			return this.missingTopicsFatal;
 		}
@@ -1023,14 +1089,32 @@ public class KafkaProperties {
 			this.missingTopicsFatal = missingTopicsFatal;
 		}
 
+		public boolean isImmediateStop() {
+			return this.immediateStop;
+		}
+
+		public void setImmediateStop(boolean immediateStop) {
+			this.immediateStop = immediateStop;
+		}
+
 	}
 
 	public static class Ssl {
 
 		/**
-		 * Password of the private key in the key store file.
+		 * Password of the private key in either key store key or key store file.
 		 */
 		private String keyPassword;
+
+		/**
+		 * Certificate chain in PEM format with a list of X.509 certificates.
+		 */
+		private String keyStoreCertificateChain;
+
+		/**
+		 * Private key in PEM format with PKCS#8 keys.
+		 */
+		private String keyStoreKey;
 
 		/**
 		 * Location of the key store file.
@@ -1046,6 +1130,11 @@ public class KafkaProperties {
 		 * Type of the key store.
 		 */
 		private String keyStoreType;
+
+		/**
+		 * Trusted certificates in PEM format with X.509 certificates.
+		 */
+		private String trustStoreCertificates;
 
 		/**
 		 * Location of the trust store file.
@@ -1075,6 +1164,22 @@ public class KafkaProperties {
 			this.keyPassword = keyPassword;
 		}
 
+		public String getKeyStoreCertificateChain() {
+			return this.keyStoreCertificateChain;
+		}
+
+		public void setKeyStoreCertificateChain(String keyStoreCertificateChain) {
+			this.keyStoreCertificateChain = keyStoreCertificateChain;
+		}
+
+		public String getKeyStoreKey() {
+			return this.keyStoreKey;
+		}
+
+		public void setKeyStoreKey(String keyStoreKey) {
+			this.keyStoreKey = keyStoreKey;
+		}
+
 		public Resource getKeyStoreLocation() {
 			return this.keyStoreLocation;
 		}
@@ -1097,6 +1202,14 @@ public class KafkaProperties {
 
 		public void setKeyStoreType(String keyStoreType) {
 			this.keyStoreType = keyStoreType;
+		}
+
+		public String getTrustStoreCertificates() {
+			return this.trustStoreCertificates;
+		}
+
+		public void setTrustStoreCertificates(String trustStoreCertificates) {
+			this.trustStoreCertificates = trustStoreCertificates;
 		}
 
 		public Resource getTrustStoreLocation() {
@@ -1132,19 +1245,37 @@ public class KafkaProperties {
 		}
 
 		public Map<String, Object> buildProperties() {
+			validate();
 			Properties properties = new Properties();
 			PropertyMapper map = PropertyMapper.get().alwaysApplyingWhenNonNull();
 			map.from(this::getKeyPassword).to(properties.in(SslConfigs.SSL_KEY_PASSWORD_CONFIG));
-			map.from(this::getKeyStoreLocation).as(this::resourceToPath)
-					.to(properties.in(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG));
+			map.from(this::getKeyStoreCertificateChain)
+				.to(properties.in(SslConfigs.SSL_KEYSTORE_CERTIFICATE_CHAIN_CONFIG));
+			map.from(this::getKeyStoreKey).to(properties.in(SslConfigs.SSL_KEYSTORE_KEY_CONFIG));
+			map.from(this::getKeyStoreLocation)
+				.as(this::resourceToPath)
+				.to(properties.in(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG));
 			map.from(this::getKeyStorePassword).to(properties.in(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG));
 			map.from(this::getKeyStoreType).to(properties.in(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG));
-			map.from(this::getTrustStoreLocation).as(this::resourceToPath)
-					.to(properties.in(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG));
+			map.from(this::getTrustStoreCertificates).to(properties.in(SslConfigs.SSL_TRUSTSTORE_CERTIFICATES_CONFIG));
+			map.from(this::getTrustStoreLocation)
+				.as(this::resourceToPath)
+				.to(properties.in(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG));
 			map.from(this::getTrustStorePassword).to(properties.in(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG));
 			map.from(this::getTrustStoreType).to(properties.in(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG));
 			map.from(this::getProtocol).to(properties.in(SslConfigs.SSL_PROTOCOL_CONFIG));
 			return properties;
+		}
+
+		private void validate() {
+			MutuallyExclusiveConfigurationPropertiesException.throwIfMultipleNonNullValuesIn((entries) -> {
+				entries.put("spring.kafka.ssl.key-store-key", this.getKeyStoreKey());
+				entries.put("spring.kafka.ssl.key-store-location", this.getKeyStoreLocation());
+			});
+			MutuallyExclusiveConfigurationPropertiesException.throwIfMultipleNonNullValuesIn((entries) -> {
+				entries.put("spring.kafka.ssl.trust-store-certificates", this.getTrustStoreCertificates());
+				entries.put("spring.kafka.ssl.trust-store-location", this.getTrustStoreLocation());
+			});
 		}
 
 		private String resourceToPath(Resource resource) {
@@ -1240,6 +1371,104 @@ public class KafkaProperties {
 
 	}
 
+	public static class Retry {
+
+		private final Topic topic = new Topic();
+
+		public Topic getTopic() {
+			return this.topic;
+		}
+
+		/**
+		 * Properties for non-blocking, topic-based retries.
+		 */
+		public static class Topic {
+
+			/**
+			 * Whether to enable topic-based non-blocking retries.
+			 */
+			private boolean enabled;
+
+			/**
+			 * Total number of processing attempts made before sending the message to the
+			 * DLT.
+			 */
+			private int attempts = 3;
+
+			/**
+			 * Canonical backoff period. Used as an initial value in the exponential case,
+			 * and as a minimum value in the uniform case.
+			 */
+			private Duration delay = Duration.ofSeconds(1);
+
+			/**
+			 * Multiplier to use for generating the next backoff delay.
+			 */
+			private double multiplier = 0.0;
+
+			/**
+			 * Maximum wait between retries. If less than the delay then the default of 30
+			 * seconds is applied.
+			 */
+			private Duration maxDelay = Duration.ZERO;
+
+			/**
+			 * Whether to have the backoff delays.
+			 */
+			private boolean randomBackOff = false;
+
+			public boolean isEnabled() {
+				return this.enabled;
+			}
+
+			public void setEnabled(boolean enabled) {
+				this.enabled = enabled;
+			}
+
+			public int getAttempts() {
+				return this.attempts;
+			}
+
+			public void setAttempts(int attempts) {
+				this.attempts = attempts;
+			}
+
+			public Duration getDelay() {
+				return this.delay;
+			}
+
+			public void setDelay(Duration delay) {
+				this.delay = delay;
+			}
+
+			public double getMultiplier() {
+				return this.multiplier;
+			}
+
+			public void setMultiplier(double multiplier) {
+				this.multiplier = multiplier;
+			}
+
+			public Duration getMaxDelay() {
+				return this.maxDelay;
+			}
+
+			public void setMaxDelay(Duration maxDelay) {
+				this.maxDelay = maxDelay;
+			}
+
+			public boolean isRandomBackOff() {
+				return this.randomBackOff;
+			}
+
+			public void setRandomBackOff(boolean randomBackOff) {
+				this.randomBackOff = randomBackOff;
+			}
+
+		}
+
+	}
+
 	public static class Cleanup {
 
 		/**
@@ -1250,7 +1479,7 @@ public class KafkaProperties {
 		/**
 		 * Cleanup the application’s local state directory on shutdown.
 		 */
-		private boolean onShutdown = true;
+		private boolean onShutdown = false;
 
 		public boolean isOnStartup() {
 			return this.onStartup;

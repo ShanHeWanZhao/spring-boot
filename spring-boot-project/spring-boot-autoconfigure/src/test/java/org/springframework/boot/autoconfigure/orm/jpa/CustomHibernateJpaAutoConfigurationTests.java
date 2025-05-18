@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,33 +56,37 @@ import static org.mockito.Mockito.mock;
 class CustomHibernateJpaAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withPropertyValues("spring.datasource.generate-unique-name=true")
-			.withUserConfiguration(TestConfiguration.class).withConfiguration(
-					AutoConfigurations.of(DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class));
+		.withPropertyValues("spring.datasource.generate-unique-name=true")
+		.withUserConfiguration(TestConfiguration.class)
+		.withConfiguration(
+				AutoConfigurations.of(DataSourceAutoConfiguration.class, HibernateJpaAutoConfiguration.class));
 
 	@Test
 	void namingStrategyDelegatorTakesPrecedence() {
-		this.contextRunner.withPropertyValues("spring.jpa.properties.hibernate.ejb.naming_strategy_delegator:"
-				+ "org.hibernate.cfg.naming.ImprovedNamingStrategyDelegator").run((context) -> {
-					JpaProperties jpaProperties = context.getBean(JpaProperties.class);
-					HibernateProperties hibernateProperties = context.getBean(HibernateProperties.class);
-					Map<String, Object> properties = hibernateProperties
-							.determineHibernateProperties(jpaProperties.getProperties(), new HibernateSettings());
-					assertThat(properties.get("hibernate.ejb.naming_strategy")).isNull();
-				});
+		this.contextRunner
+			.withPropertyValues("spring.jpa.properties.hibernate.ejb.naming_strategy_delegator:"
+					+ "org.hibernate.cfg.naming.ImprovedNamingStrategyDelegator")
+			.run((context) -> {
+				JpaProperties jpaProperties = context.getBean(JpaProperties.class);
+				HibernateProperties hibernateProperties = context.getBean(HibernateProperties.class);
+				Map<String, Object> properties = hibernateProperties
+					.determineHibernateProperties(jpaProperties.getProperties(), new HibernateSettings());
+				assertThat(properties.get("hibernate.ejb.naming_strategy")).isNull();
+			});
 	}
 
 	@Test
 	void namingStrategyBeansAreUsed() {
 		this.contextRunner.withUserConfiguration(NamingStrategyConfiguration.class)
-				.withPropertyValues("spring.datasource.url:jdbc:h2:mem:naming-strategy-beans").run((context) -> {
-					HibernateJpaConfiguration jpaConfiguration = context.getBean(HibernateJpaConfiguration.class);
-					Map<String, Object> hibernateProperties = jpaConfiguration.getVendorProperties();
-					assertThat(hibernateProperties.get("hibernate.implicit_naming_strategy"))
-							.isEqualTo(NamingStrategyConfiguration.implicitNamingStrategy);
-					assertThat(hibernateProperties.get("hibernate.physical_naming_strategy"))
-							.isEqualTo(NamingStrategyConfiguration.physicalNamingStrategy);
-				});
+			.withPropertyValues("spring.datasource.url:jdbc:h2:mem:naming-strategy-beans")
+			.run((context) -> {
+				HibernateJpaConfiguration jpaConfiguration = context.getBean(HibernateJpaConfiguration.class);
+				Map<String, Object> hibernateProperties = jpaConfiguration.getVendorProperties();
+				assertThat(hibernateProperties.get("hibernate.implicit_naming_strategy"))
+					.isEqualTo(NamingStrategyConfiguration.implicitNamingStrategy);
+				assertThat(hibernateProperties.get("hibernate.physical_naming_strategy"))
+					.isEqualTo(NamingStrategyConfiguration.physicalNamingStrategy);
+			});
 	}
 
 	@Test
@@ -96,12 +100,11 @@ class CustomHibernateJpaAutoConfigurationTests {
 
 	@Test
 	void defaultDatabaseIsSet() {
-		this.contextRunner.withPropertyValues("spring.datasource.url:jdbc:h2:mem:testdb",
-				"spring.datasource.initialization-mode:never").run((context) -> {
-					HibernateJpaVendorAdapter bean = context.getBean(HibernateJpaVendorAdapter.class);
-					Database database = (Database) ReflectionTestUtils.getField(bean, "database");
-					assertThat(database).isEqualTo(Database.DEFAULT);
-				});
+		this.contextRunner.withPropertyValues("spring.datasource.url:jdbc:h2:mem:testdb").run((context) -> {
+			HibernateJpaVendorAdapter bean = context.getBean(HibernateJpaVendorAdapter.class);
+			Database database = (Database) ReflectionTestUtils.getField(bean, "database");
+			assertThat(database).isEqualTo(Database.DEFAULT);
+		});
 	}
 
 	@Configuration(proxyBeanMethods = false)

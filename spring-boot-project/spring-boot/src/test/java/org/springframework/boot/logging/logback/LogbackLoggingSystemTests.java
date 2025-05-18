@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2021 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ import ch.qos.logback.core.ConsoleAppender;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
 import ch.qos.logback.core.rolling.RollingFileAppender;
 import ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy;
+import ch.qos.logback.core.util.DynamicClassLoadingException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,9 +68,9 @@ import org.springframework.util.StringUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.contentOf;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link LogbackLoggingSystem}.
@@ -156,8 +157,10 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(this.initializationContext, "classpath:logback-nondefault.xml",
 				getLogFile(tmpDir() + "/tmp.log", null));
 		this.logger.info("Hello world");
-		assertThat(output).doesNotContain("DEBUG").contains("Hello world").contains(tmpDir() + "/tmp.log")
-				.endsWith("BOOTBOOT");
+		assertThat(output).doesNotContain("DEBUG")
+			.contains("Hello world")
+			.contains(tmpDir() + "/tmp.log")
+			.endsWith("BOOTBOOT");
 		assertThat(new File(tmpDir() + "/tmp.log").exists()).isFalse();
 	}
 
@@ -167,8 +170,8 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		try {
 			this.loggingSystem.beforeInitialize();
 			initialize(this.initializationContext, null, null);
-			assertThat(output).contains(
-					"Ignoring 'logback.configurationFile' system property. Please use 'logging.config' instead.");
+			assertThat(output)
+				.contains("Ignoring 'logback.configurationFile' system property. Please use 'logging.config' instead.");
 		}
 		finally {
 			System.clearProperty("logback.configurationFile");
@@ -179,7 +182,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	void testNonexistentConfigLocation() {
 		this.loggingSystem.beforeInitialize();
 		assertThatIllegalStateException()
-				.isThrownBy(() -> initialize(this.initializationContext, "classpath:logback-nonexistent.xml", null));
+			.isThrownBy(() -> initialize(this.initializationContext, "classpath:logback-nonexistent.xml", null));
 	}
 
 	@Test
@@ -211,7 +214,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	@Test
-	void getLoggingConfigurations() {
+	void getLoggerConfigurations() {
 		this.loggingSystem.beforeInitialize();
 		initialize(this.initializationContext, null, null);
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
@@ -221,17 +224,17 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	@Test
-	void getLoggingConfiguration() {
+	void getLoggerConfiguration() {
 		this.loggingSystem.beforeInitialize();
 		initialize(this.initializationContext, null, null);
 		this.loggingSystem.setLogLevel(getClass().getName(), LogLevel.DEBUG);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration(getClass().getName());
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
+			.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.DEBUG, LogLevel.DEBUG));
 	}
 
 	@Test
-	void getLoggingConfigurationForLoggerThatDoesNotExistShouldReturnNull() {
+	void getLoggerConfigurationForLoggerThatDoesNotExistShouldReturnNull() {
 		this.loggingSystem.beforeInitialize();
 		initialize(this.initializationContext, null, null);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration("doesnotexist");
@@ -239,14 +242,14 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	@Test
-	void getLoggingConfigurationForALL() {
+	void getLoggerConfigurationForALL() {
 		this.loggingSystem.beforeInitialize();
 		initialize(this.initializationContext, null, null);
 		Logger logger = (Logger) StaticLoggerBinder.getSingleton().getLoggerFactory().getLogger(getClass().getName());
 		logger.setLevel(Level.ALL);
 		LoggerConfiguration configuration = this.loggingSystem.getLoggerConfiguration(getClass().getName());
 		assertThat(configuration)
-				.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.TRACE, LogLevel.TRACE));
+			.isEqualTo(new LoggerConfiguration(getClass().getName(), LogLevel.TRACE, LogLevel.TRACE));
 	}
 
 	@Test
@@ -390,7 +393,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
 		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "maxFileSize").toString())
-				.isEqualTo(expectedFileSize);
+			.isEqualTo(expectedFileSize);
 	}
 
 	@Test
@@ -453,7 +456,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(file, "Hello world")).contains("INFO");
 		assertThat(ReflectionTestUtils.getField(getRollingPolicy(), "totalSizeCap").toString())
-				.isEqualTo(expectedFileSize);
+			.isEqualTo(expectedFileSize);
 	}
 
 	@Test
@@ -517,7 +520,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(this.initializationContext, null, null);
 		LoggerContext loggerContext = (LoggerContext) StaticLoggerBinder.getSingleton().getLoggerFactory();
 		Map<String, String> properties = loggerContext.getCopyOfPropertyMap();
-		Set<String> expectedProperties = new HashSet<String>();
+		Set<String> expectedProperties = new HashSet<>();
 		ReflectionUtils.doWithFields(LogbackLoggingSystemProperties.class,
 				(field) -> expectedProperties.add((String) field.get(null)), this::isPublicStaticFinal);
 		expectedProperties.removeAll(Arrays.asList("LOG_FILE", "LOG_PATH"));
@@ -539,12 +542,12 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(this.initializationContext, null, null);
 		this.loggingSystem.beforeInitialize();
 		initialize(this.initializationContext, null, null);
-		verify(listener, times(1)).onReset(loggerContext);
+		then(listener).should().onReset(loggerContext);
 		this.loggingSystem.cleanUp();
 		loggerContext.addListener(listener);
 		this.loggingSystem.beforeInitialize();
 		initialize(this.initializationContext, null, null);
-		verify(listener, times(2)).onReset(loggerContext);
+		then(listener).should(times(2)).onReset(loggerContext);
 	}
 
 	@Test
@@ -555,7 +558,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, null, null);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(output, "Hello world"))
-				.containsPattern("\\d{4}-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
+			.containsPattern("\\d{4}-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
 	}
 
 	@Test // gh-24835
@@ -567,7 +570,7 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		initialize(loggingInitializationContext, null, null);
 		this.logger.info("Hello world");
 		assertThat(getLineWithText(output, "Hello world"))
-				.containsPattern("\\d{4}-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
+			.containsPattern("\\d{4}-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}");
 	}
 
 	@Test
@@ -588,8 +591,9 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 			File file = new File(tmpDir(), "logback-test.log");
 			LogFile logFile = getLogFile(file.getPath(), null);
 			initialize(this.initializationContext, null, logFile);
-			assertThat(output).contains("LevelChangePropagator").contains("SizeAndTimeBasedFNATP")
-					.contains("DebugLogbackConfigurator");
+			assertThat(output).contains("LevelChangePropagator")
+				.contains("SizeAndTimeBasedFNATP")
+				.contains("DebugLogbackConfigurator");
 		}
 		finally {
 			System.clearProperty("logback.debug");
@@ -621,6 +625,16 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 		assertThat(encoder.getCharset()).isEqualTo(StandardCharsets.UTF_16);
 	}
 
+	@Test
+	void whenConfigurationErrorIsDetectedUnderlyingCausesAreIncludedAsSuppressedExceptions() {
+		this.loggingSystem.beforeInitialize();
+		assertThatIllegalStateException()
+			.isThrownBy(() -> initialize(this.initializationContext, "classpath:logback-broken.xml",
+					getLogFile(tmpDir() + "/tmp.log", null)))
+			.satisfies((ex) -> assertThat(ex.getSuppressed())
+				.hasAtLeastOneElementOfType(DynamicClassLoadingException.class));
+	}
+
 	private void initialize(LoggingInitializationContext context, String configLocation, LogFile logFile) {
 		this.loggingSystem.getSystemProperties((ConfigurableEnvironment) context.getEnvironment()).apply(logFile);
 		this.loggingSystem.initialize(context, configLocation, logFile);
@@ -649,8 +663,10 @@ class LogbackLoggingSystemTests extends AbstractLoggingSystemTests {
 	}
 
 	private String getLineWithText(CharSequence output, CharSequence outputSearch) {
-		return Arrays.stream(output.toString().split("\\r?\\n")).filter((line) -> line.contains(outputSearch))
-				.findFirst().orElse(null);
+		return Arrays.stream(output.toString().split("\\r?\\n"))
+			.filter((line) -> line.contains(outputSearch))
+			.findFirst()
+			.orElse(null);
 	}
 
 }

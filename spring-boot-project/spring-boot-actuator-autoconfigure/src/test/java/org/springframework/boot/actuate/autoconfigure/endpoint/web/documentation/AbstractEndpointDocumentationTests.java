@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,9 +59,10 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWit
 		"management.endpoints.web.exposure.include=*", "spring.jackson.default-property-inclusion=non_null" })
 public abstract class AbstractEndpointDocumentationTests {
 
-	protected String describeEnumValues(Class<? extends Enum<?>> enumType) {
+	protected static String describeEnumValues(Class<? extends Enum<?>> enumType) {
 		return StringUtils.collectionToDelimitedString(Stream.of(enumType.getEnumConstants())
-				.map((constant) -> "`" + constant.name() + "`").collect(Collectors.toList()), ", ");
+			.map((constant) -> "`" + constant.name() + "`")
+			.collect(Collectors.toList()), ", ");
 	}
 
 	protected OperationPreprocessor limit(String... keys) {
@@ -99,21 +100,27 @@ public abstract class AbstractEndpointDocumentationTests {
 
 	protected FieldDescriptor parentIdField() {
 		return fieldWithPath("contexts.*.parentId").description("Id of the parent application context, if any.")
-				.optional().type(JsonFieldType.STRING);
+			.optional()
+			.type(JsonFieldType.STRING);
 	}
 
 	@SuppressWarnings("unchecked")
 	private <T> Map<String, Object> select(Map<String, Object> candidates, Predicate<T> filter) {
 		Map<String, Object> selected = new HashMap<>();
-		candidates.entrySet().stream().filter((candidate) -> filter.test((T) candidate)).limit(3)
-				.forEach((entry) -> selected.put(entry.getKey(), entry.getValue()));
+		candidates.entrySet()
+			.stream()
+			.filter((candidate) -> filter.test((T) candidate))
+			.limit(3)
+			.forEach((entry) -> selected.put(entry.getKey(), entry.getValue()));
 		return selected;
 	}
 
 	@SuppressWarnings("unchecked")
 	private <T> List<Object> select(List<Object> candidates, Predicate<T> filter) {
-		return candidates.stream().filter((candidate) -> filter.test((T) candidate)).limit(3)
-				.collect(Collectors.toList());
+		return candidates.stream()
+			.filter((candidate) -> filter.test((T) candidate))
+			.limit(3)
+			.collect(Collectors.toList());
 	}
 
 	@Configuration(proxyBeanMethods = false)

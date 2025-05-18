@@ -47,18 +47,6 @@ public class WebConversionService extends DefaultFormattingConversionService {
 			WebConversionService.class.getClassLoader());
 
 	/**
-	 * Create a new WebConversionService that configures formatters with the provided date
-	 * format, or register the default ones if no custom format is provided.
-	 * @param dateFormat the custom date format to use for date conversions
-	 * @deprecated since 2.3.0 for removal in 2.5.0 in favor of
-	 * {@link #WebConversionService(DateTimeFormatters)}
-	 */
-	@Deprecated
-	public WebConversionService(String dateFormat) {
-		this(new DateTimeFormatters().dateFormat(dateFormat));
-	}
-
-	/**
 	 * Create a new WebConversionService that configures formatters with the provided
 	 * date, time, and date-time formats, or registers the default if no custom format is
 	 * provided.

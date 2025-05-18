@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,12 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.data.redis.RedisProperties.Pool;
 import org.springframework.data.redis.connection.RedisClusterConfiguration;
 import org.springframework.data.redis.connection.RedisNode;
 import org.springframework.data.redis.connection.RedisPassword;
 import org.springframework.data.redis.connection.RedisSentinelConfiguration;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -37,24 +38,35 @@ import org.springframework.util.StringUtils;
  * @author Stephane Nicoll
  * @author Alen Turkovic
  * @author Scott Frederick
+ * @author Eddú Meléndez
  */
 abstract class RedisConnectionConfiguration {
 
+	private static final boolean COMMONS_POOL2_AVAILABLE = ClassUtils.isPresent("org.apache.commons.pool2.ObjectPool",
+			RedisConnectionConfiguration.class.getClassLoader());
+
 	private final RedisProperties properties;
+
+	private final RedisStandaloneConfiguration standaloneConfiguration;
 
 	private final RedisSentinelConfiguration sentinelConfiguration;
 
 	private final RedisClusterConfiguration clusterConfiguration;
 
 	protected RedisConnectionConfiguration(RedisProperties properties,
+			ObjectProvider<RedisStandaloneConfiguration> standaloneConfigurationProvider,
 			ObjectProvider<RedisSentinelConfiguration> sentinelConfigurationProvider,
 			ObjectProvider<RedisClusterConfiguration> clusterConfigurationProvider) {
 		this.properties = properties;
+		this.standaloneConfiguration = standaloneConfigurationProvider.getIfAvailable();
 		this.sentinelConfiguration = sentinelConfigurationProvider.getIfAvailable();
 		this.clusterConfiguration = clusterConfigurationProvider.getIfAvailable();
 	}
 
 	protected final RedisStandaloneConfiguration getStandaloneConfig() {
+		if (this.standaloneConfiguration != null) {
+			return this.standaloneConfiguration;
+		}
 		RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
 		if (StringUtils.hasText(this.properties.getUrl())) {
 			ConnectionInfo connectionInfo = parseUrl(this.properties.getUrl());
@@ -86,6 +98,7 @@ abstract class RedisConnectionConfiguration {
 			if (this.properties.getPassword() != null) {
 				config.setPassword(RedisPassword.of(this.properties.getPassword()));
 			}
+			config.setSentinelUsername(sentinelProperties.getUsername());
 			if (sentinelProperties.getPassword() != null) {
 				config.setSentinelPassword(RedisPassword.of(sentinelProperties.getPassword()));
 			}
@@ -122,13 +135,16 @@ abstract class RedisConnectionConfiguration {
 		return this.properties;
 	}
 
+	protected boolean isPoolEnabled(Pool pool) {
+		Boolean enabled = pool.getEnabled();
+		return (enabled != null) ? enabled : COMMONS_POOL2_AVAILABLE;
+	}
+
 	private List<RedisNode> createSentinels(RedisProperties.Sentinel sentinel) {
 		List<RedisNode> nodes = new ArrayList<>();
 		for (String node : sentinel.getNodes()) {
 			try {
-				String[] parts = StringUtils.split(node, ":");
-				Assert.state(parts.length == 2, "Must be defined as 'host:port'");
-				nodes.add(new RedisNode(parts[0], Integer.parseInt(parts[1])));
+				nodes.add(RedisNode.fromString(node));
 			}
 			catch (RuntimeException ex) {
 				throw new IllegalStateException("Invalid redis sentinel property '" + node + "'", ex);

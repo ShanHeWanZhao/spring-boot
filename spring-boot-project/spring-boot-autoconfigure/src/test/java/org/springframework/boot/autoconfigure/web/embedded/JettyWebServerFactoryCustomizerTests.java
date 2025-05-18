@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,8 +54,8 @@ import org.springframework.test.context.support.TestPropertySourceUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link JettyWebServerFactoryCustomizer}.
@@ -85,14 +85,14 @@ class JettyWebServerFactoryCustomizerTests {
 		this.environment.setProperty("DYNO", "-");
 		ConfigurableJettyWebServerFactory factory = mock(ConfigurableJettyWebServerFactory.class);
 		this.customizer.customize(factory);
-		verify(factory).setUseForwardHeaders(true);
+		then(factory).should().setUseForwardHeaders(true);
 	}
 
 	@Test
 	void defaultUseForwardHeaders() {
 		ConfigurableJettyWebServerFactory factory = mock(ConfigurableJettyWebServerFactory.class);
 		this.customizer.customize(factory);
-		verify(factory).setUseForwardHeaders(false);
+		then(factory).should().setUseForwardHeaders(false);
 	}
 
 	@Test
@@ -100,7 +100,7 @@ class JettyWebServerFactoryCustomizerTests {
 		this.serverProperties.setForwardHeadersStrategy(ServerProperties.ForwardHeadersStrategy.NATIVE);
 		ConfigurableJettyWebServerFactory factory = mock(ConfigurableJettyWebServerFactory.class);
 		this.customizer.customize(factory);
-		verify(factory).setUseForwardHeaders(true);
+		then(factory).should().setUseForwardHeaders(true);
 	}
 
 	@Test
@@ -109,7 +109,7 @@ class JettyWebServerFactoryCustomizerTests {
 		this.serverProperties.setForwardHeadersStrategy(ServerProperties.ForwardHeadersStrategy.NONE);
 		ConfigurableJettyWebServerFactory factory = mock(ConfigurableJettyWebServerFactory.class);
 		this.customizer.customize(factory);
-		verify(factory).setUseForwardHeaders(false);
+		then(factory).should().setUseForwardHeaders(false);
 	}
 
 	@Test
@@ -159,12 +159,12 @@ class JettyWebServerFactoryCustomizerTests {
 		assertThat(defaultQueue).isInstanceOf(BlockingArrayQueue.class);
 		assertThat(configuredQueue).isInstanceOf(BlockingArrayQueue.class);
 		assertThat(((BlockingArrayQueue<?>) defaultQueue).getMaxCapacity())
-				.isEqualTo(((BlockingArrayQueue<?>) configuredQueue).getMaxCapacity());
+			.isEqualTo(((BlockingArrayQueue<?>) configuredQueue).getMaxCapacity());
 	}
 
 	@Test
 	void threadPoolMaxThreadsCanBeCustomized() {
-		bind("server.jetty.max-threads=100");
+		bind("server.jetty.threads.max=100");
 		JettyWebServer server = customizeAndGetServer();
 		QueuedThreadPool threadPool = (QueuedThreadPool) server.getServer().getThreadPool();
 		assertThat(threadPool.getMaxThreads()).isEqualTo(100);
@@ -172,7 +172,7 @@ class JettyWebServerFactoryCustomizerTests {
 
 	@Test
 	void threadPoolMinThreadsCanBeCustomized() {
-		bind("server.jetty.min-threads=100");
+		bind("server.jetty.threads.min=100");
 		JettyWebServer server = customizeAndGetServer();
 		QueuedThreadPool threadPool = (QueuedThreadPool) server.getServer().getThreadPool();
 		assertThat(threadPool.getMinThreads()).isEqualTo(100);
@@ -198,8 +198,8 @@ class JettyWebServerFactoryCustomizerTests {
 
 	@Test
 	void threadPoolWithMaxQueueCapacityEqualToZeroCustomizesThreadPool() {
-		bind("server.jetty.threads.max-queue-capacity=0", "server.jetty.min-threads=100",
-				"server.jetty.max-threads=100", "server.jetty.threads.idle-timeout=6s");
+		bind("server.jetty.threads.max-queue-capacity=0", "server.jetty.threads.min=100",
+				"server.jetty.threads.max=100", "server.jetty.threads.idle-timeout=6s");
 		JettyWebServer server = customizeAndGetServer();
 		QueuedThreadPool threadPool = (QueuedThreadPool) server.getServer().getThreadPool();
 		assertThat(threadPool.getMinThreads()).isEqualTo(100);
@@ -220,8 +220,8 @@ class JettyWebServerFactoryCustomizerTests {
 
 	@Test
 	void threadPoolWithMaxQueueCapacityPositiveCustomizesThreadPool() {
-		bind("server.jetty.threads.max-queue-capacity=1234", "server.jetty.min-threads=10",
-				"server.jetty.max-threads=150", "server.jetty.threads.idle-timeout=3s");
+		bind("server.jetty.threads.max-queue-capacity=1234", "server.jetty.threads.min=10",
+				"server.jetty.threads.max=150", "server.jetty.threads.idle-timeout=3s");
 		JettyWebServer server = customizeAndGetServer();
 		QueuedThreadPool threadPool = (QueuedThreadPool) server.getServer().getThreadPool();
 		assertThat(threadPool.getMinThreads()).isEqualTo(10);
@@ -236,7 +236,7 @@ class JettyWebServerFactoryCustomizerTests {
 		assertThat(queuedThreadPool.getMinThreads()).isEqualTo(defaultProperties.getThreads().getMin());
 		assertThat(queuedThreadPool.getMaxThreads()).isEqualTo(defaultProperties.getThreads().getMax());
 		assertThat(queuedThreadPool.getIdleTimeout())
-				.isEqualTo(defaultProperties.getThreads().getIdleTimeout().toMillis());
+			.isEqualTo(defaultProperties.getThreads().getIdleTimeout().toMillis());
 	}
 
 	private CustomRequestLog getRequestLog(JettyWebServer server) {
@@ -256,7 +256,7 @@ class JettyWebServerFactoryCustomizerTests {
 		this.serverProperties.setForwardHeadersStrategy(ForwardHeadersStrategy.NATIVE);
 		ConfigurableJettyWebServerFactory factory = mock(ConfigurableJettyWebServerFactory.class);
 		this.customizer.customize(factory);
-		verify(factory).setUseForwardHeaders(true);
+		then(factory).should().setUseForwardHeaders(true);
 	}
 
 	@Test
@@ -296,8 +296,9 @@ class JettyWebServerFactoryCustomizerTests {
 		server.start();
 		server.stop();
 		return Arrays.stream(server.getServer().getConnectors())
-				.filter((connector) -> connector instanceof AbstractConnector).map(Connector::getIdleTimeout)
-				.collect(Collectors.toList());
+			.filter((connector) -> connector instanceof AbstractConnector)
+			.map(Connector::getIdleTimeout)
+			.collect(Collectors.toList());
 	}
 
 	private List<Integer> getRequestHeaderSizes(JettyWebServer server) {
@@ -307,12 +308,14 @@ class JettyWebServerFactoryCustomizerTests {
 		server.stop();
 		Connector[] connectors = server.getServer().getConnectors();
 		for (Connector connector : connectors) {
-			connector.getConnectionFactories().stream().filter((factory) -> factory instanceof ConnectionFactory)
-					.forEach((cf) -> {
-						ConnectionFactory factory = (ConnectionFactory) cf;
-						HttpConfiguration configuration = factory.getHttpConfiguration();
-						requestHeaderSizes.add(configuration.getRequestHeaderSize());
-					});
+			connector.getConnectionFactories()
+				.stream()
+				.filter((factory) -> factory instanceof ConnectionFactory)
+				.forEach((cf) -> {
+					ConnectionFactory factory = (ConnectionFactory) cf;
+					HttpConfiguration configuration = factory.getHttpConfiguration();
+					requestHeaderSizes.add(configuration.getRequestHeaderSize());
+				});
 		}
 		return requestHeaderSizes;
 	}

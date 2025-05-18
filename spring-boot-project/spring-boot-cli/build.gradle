@@ -1,5 +1,6 @@
 plugins {
 	id "java"
+	id "eclipse"
 	id "org.springframework.boot.deployed"
 	id "org.springframework.boot.conventions"
 	id "org.springframework.boot.integration-test"
@@ -7,18 +8,16 @@ plugins {
 
 description = "Spring Boot CLI"
 
-toolchain {
-	maximumCompatibleJavaVersion = JavaLanguageVersion.of(15)
-}
-
 configurations {
 	dependenciesBom
 	loader
 	testRepository
+	compileOnlyProject
+	compileClasspath.extendsFrom(compileOnlyProject)
 }
 
 dependencies {
-	compileOnly(project(":spring-boot-project:spring-boot"))
+	compileOnlyProject(project(":spring-boot-project:spring-boot"))
 	compileOnly("jakarta.servlet:jakarta.servlet-api")
 	compileOnly("org.codehaus.groovy:groovy-templates")
 	compileOnly("org.springframework:spring-web")
@@ -35,13 +34,16 @@ dependencies {
 	implementation("org.apache.maven:maven-model")
 	implementation("org.apache.maven:maven-resolver-provider") {
 		exclude group: "com.google.guava", module: "guava"
+		exclude group: "javax.inject", module: "javax.inject"
 	}
 	implementation("org.apache.maven.resolver:maven-resolver-connector-basic")
 	implementation("org.apache.maven.resolver:maven-resolver-transport-file")
 	implementation("org.apache.maven.resolver:maven-resolver-transport-http") {
 		exclude group: "org.slf4j", module: "jcl-over-slf4j"
 	}
-	implementation("org.apache.maven:maven-settings-builder")
+	implementation("org.apache.maven:maven-settings-builder") {
+		exclude group: "javax.inject", module: "javax.inject"
+	}
 	implementation("org.codehaus.groovy:groovy")
 	implementation("org.slf4j:slf4j-simple")
 	implementation("org.sonatype.plexus:plexus-sec-dispatcher")
@@ -60,6 +62,7 @@ dependencies {
 
 	loader(project(":spring-boot-project:spring-boot-tools:spring-boot-loader"))
 
+	testCompileOnly("org.apache.tomcat.embed:tomcat-embed-core")
 	testImplementation(project(":spring-boot-project:spring-boot"))
 	testImplementation(project(":spring-boot-project:spring-boot-tools:spring-boot-test-support"))
 	testImplementation(project(":spring-boot-project:spring-boot-test"))
@@ -104,7 +107,7 @@ test {
 
 task fullJar(type: Jar) {
 	dependsOn configurations.loader
-	classifier = "full"
+	archiveClassifier = "full"
 	entryCompression = "stored"
 	from(configurations.runtimeClasspath) {
 		into "BOOT-INF/lib"
@@ -116,6 +119,7 @@ task fullJar(type: Jar) {
 		zipTree(configurations.loader.singleFile).matching {
 			exclude "META-INF/LICENSE.txt"
 			exclude "META-INF/NOTICE.txt"
+			exclude "META-INF/spring-boot.properties"
 		}
 	}
 	manifest {
@@ -128,7 +132,7 @@ task fullJar(type: Jar) {
 }
 
 def configureArchive(archive) {
-	archive.classifier = "bin"
+	archive.archiveClassifier = "bin"
 	archive.into "spring-${project.version}"
 	archive.from(fullJar) {
 		rename {
@@ -146,7 +150,7 @@ def configureArchive(archive) {
 }
 
 task zip(type: Zip) {
-	classifier = "bin"
+	archiveClassifier = "bin"
 	configureArchive it
 }
 
@@ -158,19 +162,6 @@ task tar(type: Tar) {
 	compression = "gzip"
 	archiveExtension = "tar.gz"
 	configureArchive it
-}
-
-task scoopManifest(type: org.springframework.boot.build.cli.ScoopManifest) {
-	dependsOn zip
-	outputDir = file("${buildDir}/scoop")
-	template = file("src/main/scoop/springboot.json")
-	archive = zip.archiveFile
-}
-
-def scoopManifestArtifact = artifacts.add("archives", file("${buildDir}/scoop/springboot.json")) {
-	type "json"
-	classifier "scoop"
-	builtBy "scoopManifest"
 }
 
 task homebrewFormula(type: org.springframework.boot.build.cli.HomebrewFormula) {
@@ -192,9 +183,11 @@ publishing {
 			artifact fullJar
 			artifact tar
 			artifact zip
-			artifact scoopManifestArtifact
 			artifact homebrewFormulaArtifact
 		}
 	}
 }
 
+eclipse.classpath { // https://github.com/eclipse/buildship/issues/939
+	plusConfigurations += [ configurations.compileOnlyProject ]
+}

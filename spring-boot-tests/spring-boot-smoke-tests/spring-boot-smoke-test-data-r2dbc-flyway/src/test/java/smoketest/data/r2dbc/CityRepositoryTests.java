@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 
 package smoketest.data.r2dbc;
+
+import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -39,7 +41,7 @@ class CityRepositoryTests {
 
 	@Container
 	static PostgreSQLContainer<?> postgresql = new PostgreSQLContainer<>(DockerImageNames.postgresql())
-			.withDatabaseName("test_flyway");
+		.withDatabaseName("test_flyway");
 
 	@DynamicPropertySource
 	static void postgresqlProperties(DynamicPropertyRegistry registry) {
@@ -59,7 +61,9 @@ class CityRepositoryTests {
 	@Test
 	void databaseHasBeenInitialized() {
 		StepVerifier.create(this.repository.findByState("DC").filter((city) -> city.getName().equals("Washington")))
-				.consumeNextWith((city) -> assertThat(city.getId()).isNotNull()).verifyComplete();
+			.consumeNextWith((city) -> assertThat(city.getId()).isNotNull())
+			.expectComplete()
+			.verify(Duration.ofSeconds(30));
 	}
 
 	private static String r2dbcUrl() {

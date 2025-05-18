@@ -16,6 +16,10 @@
 	"HostConfig": {
 		"Binds": [
 			"bind-source:bind-dest"
+		],
+		"NetworkMode": "test",
+		"SecurityOpt": [
+			"option=value"
 		]
 	}
 }

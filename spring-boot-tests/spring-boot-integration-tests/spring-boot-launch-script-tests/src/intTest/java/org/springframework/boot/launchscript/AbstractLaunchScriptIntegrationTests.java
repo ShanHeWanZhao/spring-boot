@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.function.Predicate;
 
 import org.assertj.core.api.Condition;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
@@ -41,6 +43,7 @@ import static org.hamcrest.Matchers.containsString;
  * @author Andy Wilkinson
  * @author Ali Shahbour
  * @author Alexey Vinogradov
+ * @author Moritz Halbritter
  */
 abstract class AbstractLaunchScriptIntegrationTests {
 
@@ -85,6 +88,7 @@ abstract class AbstractLaunchScriptIntegrationTests {
 		try (LaunchScriptTestContainer container = new LaunchScriptTestContainer(os, version, this.scriptsDir,
 				script)) {
 			container.withLogConsumer(consumer);
+			container.withLogConsumer(new Slf4jLogConsumer(LoggerFactory.getLogger("docker")));
 			container.start();
 			while (container.isRunning()) {
 				Thread.sleep(100);
@@ -96,9 +100,7 @@ abstract class AbstractLaunchScriptIntegrationTests {
 	private static final class LaunchScriptTestContainer extends GenericContainer<LaunchScriptTestContainer> {
 
 		private LaunchScriptTestContainer(String os, String version, String scriptsDir, String testScript) {
-			super(new ImageFromDockerfile("spring-boot-launch-script/" + os.toLowerCase() + "-" + version)
-					.withFileFromFile("Dockerfile",
-							new File("src/intTest/resources/conf/" + os + "/" + version + "/Dockerfile")));
+			super(createImage(os, version));
 			withCopyFileToContainer(MountableFile.forHostPath(findApplication().getAbsolutePath()), "/app.jar");
 			withCopyFileToContainer(
 					MountableFile.forHostPath("src/intTest/resources/scripts/" + scriptsDir + "test-functions.sh"),
@@ -106,8 +108,20 @@ abstract class AbstractLaunchScriptIntegrationTests {
 			withCopyFileToContainer(
 					MountableFile.forHostPath("src/intTest/resources/scripts/" + scriptsDir + testScript),
 					"/" + testScript);
-			withCommand("/bin/bash", "-c", "chmod +x " + testScript + " && ./" + testScript);
+			withCommand("/bin/bash", "-c",
+					"chown root:root *.sh && chown root:root *.jar && chmod +x " + testScript + " && ./" + testScript);
 			withStartupCheckStrategy(new OneShotStartupCheckStrategy().withTimeout(Duration.ofMinutes(5)));
+		}
+
+		private static ImageFromDockerfile createImage(String os, String version) {
+			ImageFromDockerfile image = new ImageFromDockerfile(
+					"spring-boot-launch-script/" + os.toLowerCase() + "-" + version);
+			image.withFileFromFile("Dockerfile",
+					new File("src/intTest/resources/conf/" + os + "/" + version + "/Dockerfile"));
+			for (File file : new File("build/downloads/jdk/bellsoft").listFiles()) {
+				image.withFileFromFile("downloads/" + file.getName(), file);
+			}
+			return image;
 		}
 
 		private static File findApplication() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.util.Map;
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration;
 import org.springframework.boot.actuate.autoconfigure.web.ManagementContextType;
+import org.springframework.boot.context.annotation.ImportCandidates;
 import org.springframework.context.annotation.DeferredImportSelector;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
@@ -36,14 +37,15 @@ import org.springframework.util.StringUtils;
 
 /**
  * Selects configuration classes for the management context configuration. Entries are
- * loaded from {@code /META-INF/spring.factories} under the
- * {@code org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration}
- * key.
+ * loaded from
+ * {@code /META-INF/spring/org.springframework.boot.actuate.autoconfigure.web.ManagementContextConfiguration.imports}.
  *
  * @author Dave Syer
  * @author Phillip Webb
  * @author Andy Wilkinson
+ * @author Moritz Halbritter
  * @see ManagementContextConfiguration
+ * @see ImportCandidates
  */
 @Order(Ordered.LOWEST_PRECEDENCE)
 class ManagementContextConfigurationImportSelector implements DeferredImportSelector, BeanClassLoaderAware {
@@ -53,7 +55,8 @@ class ManagementContextConfigurationImportSelector implements DeferredImportSele
 	@Override
 	public String[] selectImports(AnnotationMetadata metadata) {
 		ManagementContextType contextType = (ManagementContextType) metadata
-				.getAnnotationAttributes(EnableManagementContext.class.getName()).get("value");
+			.getAnnotationAttributes(EnableManagementContext.class.getName())
+			.get("value");
 		// Find all management context configuration classes, filtering duplicates
 		List<ManagementConfiguration> configurations = getConfigurations();
 		OrderComparator.sort(configurations);
@@ -88,7 +91,10 @@ class ManagementContextConfigurationImportSelector implements DeferredImportSele
 	}
 
 	protected List<String> loadFactoryNames() {
-		return SpringFactoriesLoader.loadFactoryNames(ManagementContextConfiguration.class, this.classLoader);
+		List<String> factoryNames = new ArrayList<>(
+				SpringFactoriesLoader.loadFactoryNames(ManagementContextConfiguration.class, this.classLoader));
+		ImportCandidates.load(ManagementContextConfiguration.class, this.classLoader).forEach(factoryNames::add);
+		return factoryNames;
 	}
 
 	@Override
@@ -116,7 +122,7 @@ class ManagementContextConfigurationImportSelector implements DeferredImportSele
 
 		private ManagementContextType readContextType(AnnotationMetadata annotationMetadata) {
 			Map<String, Object> annotationAttributes = annotationMetadata
-					.getAnnotationAttributes(ManagementContextConfiguration.class.getName());
+				.getAnnotationAttributes(ManagementContextConfiguration.class.getName());
 			return (annotationAttributes != null) ? (ManagementContextType) annotationAttributes.get("value")
 					: ManagementContextType.ANY;
 		}

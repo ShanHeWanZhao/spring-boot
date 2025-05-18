@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,10 +26,12 @@ import org.apache.catalina.valves.ErrorReportValve;
 import org.apache.catalina.valves.RemoteIpValve;
 import org.apache.coyote.AbstractProtocol;
 import org.apache.coyote.ProtocolHandler;
+import org.apache.coyote.UpgradeProtocol;
 import org.apache.coyote.http11.AbstractHttp11Protocol;
+import org.apache.coyote.http2.Http2Protocol;
 
 import org.springframework.boot.autoconfigure.web.ErrorProperties;
-import org.springframework.boot.autoconfigure.web.ErrorProperties.IncludeStacktrace;
+import org.springframework.boot.autoconfigure.web.ErrorProperties.IncludeAttribute;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.boot.autoconfigure.web.ServerProperties.Tomcat.Accesslog;
 import org.springframework.boot.autoconfigure.web.ServerProperties.Tomcat.Remoteip;
@@ -56,6 +58,7 @@ import org.springframework.util.unit.DataSize;
  * @author Dirk Deyne
  * @author Rafiullah Hamedy
  * @author Victor Mandujano
+ * @author Parviz Rozikov
  * @since 2.0.0
  */
 public class TomcatWebServerFactoryCustomizer
@@ -81,37 +84,62 @@ public class TomcatWebServerFactoryCustomizer
 		ServerProperties.Tomcat tomcatProperties = properties.getTomcat();
 		PropertyMapper propertyMapper = PropertyMapper.get();
 		propertyMapper.from(tomcatProperties::getBasedir).whenNonNull().to(factory::setBaseDirectory);
-		propertyMapper.from(tomcatProperties::getBackgroundProcessorDelay).whenNonNull().as(Duration::getSeconds)
-				.as(Long::intValue).to(factory::setBackgroundProcessorDelay);
+		propertyMapper.from(tomcatProperties::getBackgroundProcessorDelay)
+			.whenNonNull()
+			.as(Duration::getSeconds)
+			.as(Long::intValue)
+			.to(factory::setBackgroundProcessorDelay);
 		customizeRemoteIpValve(factory);
 		ServerProperties.Tomcat.Threads threadProperties = tomcatProperties.getThreads();
-		propertyMapper.from(threadProperties::getMax).when(this::isPositive)
-				.to((maxThreads) -> customizeMaxThreads(factory, threadProperties.getMax()));
-		propertyMapper.from(threadProperties::getMinSpare).when(this::isPositive)
-				.to((minSpareThreads) -> customizeMinThreads(factory, minSpareThreads));
-		propertyMapper.from(this.serverProperties.getMaxHttpHeaderSize()).whenNonNull().asInt(DataSize::toBytes)
-				.when(this::isPositive)
-				.to((maxHttpHeaderSize) -> customizeMaxHttpHeaderSize(factory, maxHttpHeaderSize));
-		propertyMapper.from(tomcatProperties::getMaxSwallowSize).whenNonNull().asInt(DataSize::toBytes)
-				.to((maxSwallowSize) -> customizeMaxSwallowSize(factory, maxSwallowSize));
-		propertyMapper.from(tomcatProperties::getMaxHttpFormPostSize).asInt(DataSize::toBytes)
-				.when((maxHttpFormPostSize) -> maxHttpFormPostSize != 0)
-				.to((maxHttpFormPostSize) -> customizeMaxHttpFormPostSize(factory, maxHttpFormPostSize));
-		propertyMapper.from(tomcatProperties::getAccesslog).when(ServerProperties.Tomcat.Accesslog::isEnabled)
-				.to((enabled) -> customizeAccessLog(factory));
+		propertyMapper.from(threadProperties::getMax)
+			.when(this::isPositive)
+			.to((maxThreads) -> customizeMaxThreads(factory, threadProperties.getMax()));
+		propertyMapper.from(threadProperties::getMinSpare)
+			.when(this::isPositive)
+			.to((minSpareThreads) -> customizeMinThreads(factory, minSpareThreads));
+		propertyMapper.from(this.serverProperties.getMaxHttpHeaderSize())
+			.whenNonNull()
+			.asInt(DataSize::toBytes)
+			.when(this::isPositive)
+			.to((maxHttpHeaderSize) -> customizeMaxHttpHeaderSize(factory, maxHttpHeaderSize));
+		propertyMapper.from(tomcatProperties::getMaxSwallowSize)
+			.whenNonNull()
+			.asInt(DataSize::toBytes)
+			.to((maxSwallowSize) -> customizeMaxSwallowSize(factory, maxSwallowSize));
+		propertyMapper.from(tomcatProperties::getMaxHttpFormPostSize)
+			.asInt(DataSize::toBytes)
+			.when((maxHttpFormPostSize) -> maxHttpFormPostSize != 0)
+			.to((maxHttpFormPostSize) -> customizeMaxHttpFormPostSize(factory, maxHttpFormPostSize));
+		propertyMapper.from(tomcatProperties::getAccesslog)
+			.when(ServerProperties.Tomcat.Accesslog::isEnabled)
+			.to((enabled) -> customizeAccessLog(factory));
 		propertyMapper.from(tomcatProperties::getUriEncoding).whenNonNull().to(factory::setUriEncoding);
-		propertyMapper.from(tomcatProperties::getConnectionTimeout).whenNonNull()
-				.to((connectionTimeout) -> customizeConnectionTimeout(factory, connectionTimeout));
-		propertyMapper.from(tomcatProperties::getMaxConnections).when(this::isPositive)
-				.to((maxConnections) -> customizeMaxConnections(factory, maxConnections));
-		propertyMapper.from(tomcatProperties::getAcceptCount).when(this::isPositive)
-				.to((acceptCount) -> customizeAcceptCount(factory, acceptCount));
+		propertyMapper.from(tomcatProperties::getConnectionTimeout)
+			.whenNonNull()
+			.to((connectionTimeout) -> customizeConnectionTimeout(factory, connectionTimeout));
+		propertyMapper.from(tomcatProperties::getMaxConnections)
+			.when(this::isPositive)
+			.to((maxConnections) -> customizeMaxConnections(factory, maxConnections));
+		propertyMapper.from(tomcatProperties::getAcceptCount)
+			.when(this::isPositive)
+			.to((acceptCount) -> customizeAcceptCount(factory, acceptCount));
 		propertyMapper.from(tomcatProperties::getProcessorCache)
-				.to((processorCache) -> customizeProcessorCache(factory, processorCache));
-		propertyMapper.from(tomcatProperties::getRelaxedPathChars).as(this::joinCharacters).whenHasText()
-				.to((relaxedChars) -> customizeRelaxedPathChars(factory, relaxedChars));
-		propertyMapper.from(tomcatProperties::getRelaxedQueryChars).as(this::joinCharacters).whenHasText()
-				.to((relaxedChars) -> customizeRelaxedQueryChars(factory, relaxedChars));
+			.to((processorCache) -> customizeProcessorCache(factory, processorCache));
+		propertyMapper.from(tomcatProperties::getKeepAliveTimeout)
+			.whenNonNull()
+			.to((keepAliveTimeout) -> customizeKeepAliveTimeout(factory, keepAliveTimeout));
+		propertyMapper.from(tomcatProperties::getMaxKeepAliveRequests)
+			.to((maxKeepAliveRequests) -> customizeMaxKeepAliveRequests(factory, maxKeepAliveRequests));
+		propertyMapper.from(tomcatProperties::getRelaxedPathChars)
+			.as(this::joinCharacters)
+			.whenHasText()
+			.to((relaxedChars) -> customizeRelaxedPathChars(factory, relaxedChars));
+		propertyMapper.from(tomcatProperties::getRelaxedQueryChars)
+			.as(this::joinCharacters)
+			.whenHasText()
+			.to((relaxedChars) -> customizeRelaxedQueryChars(factory, relaxedChars));
+		propertyMapper.from(tomcatProperties::isRejectIllegalHeader)
+			.to((rejectIllegalHeader) -> customizeRejectIllegalHeader(factory, rejectIllegalHeader));
 		customizeStaticResources(factory);
 		customizeErrorReportValve(properties.getError(), factory);
 	}
@@ -135,6 +163,31 @@ public class TomcatWebServerFactoryCustomizer
 			ProtocolHandler handler = connector.getProtocolHandler();
 			if (handler instanceof AbstractProtocol) {
 				((AbstractProtocol<?>) handler).setProcessorCache(processorCache);
+			}
+		});
+	}
+
+	private void customizeKeepAliveTimeout(ConfigurableTomcatWebServerFactory factory, Duration keepAliveTimeout) {
+		factory.addConnectorCustomizers((connector) -> {
+			ProtocolHandler handler = connector.getProtocolHandler();
+			for (UpgradeProtocol upgradeProtocol : handler.findUpgradeProtocols()) {
+				if (upgradeProtocol instanceof Http2Protocol) {
+					((Http2Protocol) upgradeProtocol).setKeepAliveTimeout(keepAliveTimeout.toMillis());
+				}
+			}
+			if (handler instanceof AbstractProtocol) {
+				AbstractProtocol<?> protocol = (AbstractProtocol<?>) handler;
+				protocol.setKeepAliveTimeout((int) keepAliveTimeout.toMillis());
+			}
+		});
+	}
+
+	private void customizeMaxKeepAliveRequests(ConfigurableTomcatWebServerFactory factory, int maxKeepAliveRequests) {
+		factory.addConnectorCustomizers((connector) -> {
+			ProtocolHandler handler = connector.getProtocolHandler();
+			if (handler instanceof AbstractHttp11Protocol) {
+				AbstractHttp11Protocol<?> protocol = (AbstractHttp11Protocol<?>) handler;
+				protocol.setMaxKeepAliveRequests(maxKeepAliveRequests);
 			}
 		});
 	}
@@ -165,6 +218,17 @@ public class TomcatWebServerFactoryCustomizer
 
 	private void customizeRelaxedQueryChars(ConfigurableTomcatWebServerFactory factory, String relaxedChars) {
 		factory.addConnectorCustomizers((connector) -> connector.setProperty("relaxedQueryChars", relaxedChars));
+	}
+
+	@SuppressWarnings("deprecation")
+	private void customizeRejectIllegalHeader(ConfigurableTomcatWebServerFactory factory, boolean rejectIllegalHeader) {
+		factory.addConnectorCustomizers((connector) -> {
+			ProtocolHandler handler = connector.getProtocolHandler();
+			if (handler instanceof AbstractHttp11Protocol) {
+				AbstractHttp11Protocol<?> protocol = (AbstractHttp11Protocol<?>) handler;
+				protocol.setRejectIllegalHeader(rejectIllegalHeader);
+			}
+		});
 	}
 
 	private String joinCharacters(List<Character> content) {
@@ -236,6 +300,11 @@ public class TomcatWebServerFactoryCustomizer
 			if (handler instanceof AbstractHttp11Protocol) {
 				AbstractHttp11Protocol protocol = (AbstractHttp11Protocol) handler;
 				protocol.setMaxHttpHeaderSize(maxHttpHeaderSize);
+				for (UpgradeProtocol upgradeProtocol : protocol.findUpgradeProtocols()) {
+					if (upgradeProtocol instanceof Http2Protocol) {
+						((Http2Protocol) upgradeProtocol).setMaxHeaderSize(maxHttpHeaderSize);
+					}
+				}
 			}
 		});
 	}
@@ -292,7 +361,7 @@ public class TomcatWebServerFactoryCustomizer
 	}
 
 	private void customizeErrorReportValve(ErrorProperties error, ConfigurableTomcatWebServerFactory factory) {
-		if (error.getIncludeStacktrace() == IncludeStacktrace.NEVER) {
+		if (error.getIncludeStacktrace() == IncludeAttribute.NEVER) {
 			factory.addContextCustomizers((context) -> {
 				ErrorReportValve valve = new ErrorReportValve();
 				valve.setShowServerInfo(false);

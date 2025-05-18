@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,14 +31,19 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  * @author Wei Jiang
  * @author Scott Frederick
  */
-public class DockerTests {
+class DockerTests {
 
 	@Test
 	void asDockerConfigurationWithDefaults() {
 		Docker docker = new Docker();
-		assertThat(docker.asDockerConfiguration().getHost()).isNull();
-		assertThat(docker.asDockerConfiguration().getBuilderRegistryAuthentication()).isNull();
-		assertThat(docker.asDockerConfiguration().getPublishRegistryAuthentication()).isNull();
+		DockerConfiguration dockerConfiguration = docker.asDockerConfiguration();
+		assertThat(dockerConfiguration.getHost()).isNull();
+		assertThat(dockerConfiguration.getBuilderRegistryAuthentication()).isNull();
+		assertThat(decoded(dockerConfiguration.getPublishRegistryAuthentication().getAuthHeader()))
+			.contains("\"username\" : \"\"")
+			.contains("\"password\" : \"\"")
+			.contains("\"email\" : \"\"")
+			.contains("\"serveraddress\" : \"\"");
 	}
 
 	@Test
@@ -52,8 +57,34 @@ public class DockerTests {
 		assertThat(host.getAddress()).isEqualTo("docker.example.com");
 		assertThat(host.isSecure()).isEqualTo(true);
 		assertThat(host.getCertificatePath()).isEqualTo("/tmp/ca-cert");
+		assertThat(dockerConfiguration.isBindHostToBuilder()).isFalse();
 		assertThat(docker.asDockerConfiguration().getBuilderRegistryAuthentication()).isNull();
-		assertThat(docker.asDockerConfiguration().getPublishRegistryAuthentication()).isNull();
+		assertThat(decoded(dockerConfiguration.getPublishRegistryAuthentication().getAuthHeader()))
+			.contains("\"username\" : \"\"")
+			.contains("\"password\" : \"\"")
+			.contains("\"email\" : \"\"")
+			.contains("\"serveraddress\" : \"\"");
+	}
+
+	@Test
+	void asDockerConfigurationWithBindHostToBuilder() {
+		Docker docker = new Docker();
+		docker.setHost("docker.example.com");
+		docker.setTlsVerify(true);
+		docker.setCertPath("/tmp/ca-cert");
+		docker.setBindHostToBuilder(true);
+		DockerConfiguration dockerConfiguration = docker.asDockerConfiguration();
+		DockerHost host = dockerConfiguration.getHost();
+		assertThat(host.getAddress()).isEqualTo("docker.example.com");
+		assertThat(host.isSecure()).isEqualTo(true);
+		assertThat(host.getCertificatePath()).isEqualTo("/tmp/ca-cert");
+		assertThat(dockerConfiguration.isBindHostToBuilder()).isTrue();
+		assertThat(docker.asDockerConfiguration().getBuilderRegistryAuthentication()).isNull();
+		assertThat(decoded(dockerConfiguration.getPublishRegistryAuthentication().getAuthHeader()))
+			.contains("\"username\" : \"\"")
+			.contains("\"password\" : \"\"")
+			.contains("\"email\" : \"\"")
+			.contains("\"serveraddress\" : \"\"");
 	}
 
 	@Test
@@ -65,13 +96,15 @@ public class DockerTests {
 				new Docker.DockerRegistry("user2", "secret2", "https://docker2.example.com", "docker2@example.com"));
 		DockerConfiguration dockerConfiguration = docker.asDockerConfiguration();
 		assertThat(decoded(dockerConfiguration.getBuilderRegistryAuthentication().getAuthHeader()))
-				.contains("\"username\" : \"user1\"").contains("\"password\" : \"secret1\"")
-				.contains("\"email\" : \"docker1@example.com\"")
-				.contains("\"serveraddress\" : \"https://docker1.example.com\"");
+			.contains("\"username\" : \"user1\"")
+			.contains("\"password\" : \"secret1\"")
+			.contains("\"email\" : \"docker1@example.com\"")
+			.contains("\"serveraddress\" : \"https://docker1.example.com\"");
 		assertThat(decoded(dockerConfiguration.getPublishRegistryAuthentication().getAuthHeader()))
-				.contains("\"username\" : \"user2\"").contains("\"password\" : \"secret2\"")
-				.contains("\"email\" : \"docker2@example.com\"")
-				.contains("\"serveraddress\" : \"https://docker2.example.com\"");
+			.contains("\"username\" : \"user2\"")
+			.contains("\"password\" : \"secret2\"")
+			.contains("\"email\" : \"docker2@example.com\"")
+			.contains("\"serveraddress\" : \"https://docker2.example.com\"");
 	}
 
 	@Test
@@ -80,7 +113,7 @@ public class DockerTests {
 		docker.setBuilderRegistry(
 				new Docker.DockerRegistry("user", null, "https://docker.example.com", "docker@example.com"));
 		assertThatIllegalArgumentException().isThrownBy(docker::asDockerConfiguration)
-				.withMessageContaining("Invalid Docker builder registry configuration");
+			.withMessageContaining("Invalid Docker builder registry configuration");
 	}
 
 	@Test
@@ -89,7 +122,7 @@ public class DockerTests {
 		docker.setPublishRegistry(
 				new Docker.DockerRegistry("user", null, "https://docker.example.com", "docker@example.com"));
 		assertThatIllegalArgumentException().isThrownBy(docker::asDockerConfiguration)
-				.withMessageContaining("Invalid Docker publish registry configuration");
+			.withMessageContaining("Invalid Docker publish registry configuration");
 	}
 
 	@Test
@@ -99,9 +132,9 @@ public class DockerTests {
 		docker.setPublishRegistry(new Docker.DockerRegistry("token2"));
 		DockerConfiguration dockerConfiguration = docker.asDockerConfiguration();
 		assertThat(decoded(dockerConfiguration.getBuilderRegistryAuthentication().getAuthHeader()))
-				.contains("\"identitytoken\" : \"token1\"");
+			.contains("\"identitytoken\" : \"token1\"");
 		assertThat(decoded(dockerConfiguration.getPublishRegistryAuthentication().getAuthHeader()))
-				.contains("\"identitytoken\" : \"token2\"");
+			.contains("\"identitytoken\" : \"token2\"");
 	}
 
 	@Test
@@ -113,7 +146,7 @@ public class DockerTests {
 		Docker docker = new Docker();
 		docker.setBuilderRegistry(dockerRegistry);
 		assertThatIllegalArgumentException().isThrownBy(docker::asDockerConfiguration)
-				.withMessageContaining("Invalid Docker builder registry configuration");
+			.withMessageContaining("Invalid Docker builder registry configuration");
 	}
 
 	String decoded(String value) {

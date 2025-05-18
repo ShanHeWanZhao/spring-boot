@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,9 @@
 
 package org.springframework.boot.json;
 
+import java.io.IOException;
+
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.constructor.ConstructorException;
 
@@ -26,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  *
  * @author Dave Syer
  */
-public class YamlJsonParserTests extends AbstractJsonParserTests {
+class YamlJsonParserTests extends AbstractJsonParserTests {
 
 	@Override
 	protected JsonParser getParser() {
@@ -34,10 +37,38 @@ public class YamlJsonParserTests extends AbstractJsonParserTests {
 	}
 
 	@Test
-	void customTypesAreNotLoaded() throws Exception {
+	void customTypesAreNotLoaded() {
 		assertThatExceptionOfType(ConstructorException.class)
-				.isThrownBy(() -> getParser().parseMap("{value: !!java.net.URL [\"http://localhost:9000/\"]}"))
-				.withCauseInstanceOf(IllegalStateException.class);
+			.isThrownBy(() -> getParser().parseMap("{value: !!java.net.URL [\"http://localhost:9000/\"]}"))
+			.withCauseInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	@Override
+	@Disabled("SnakeYaml does not fail when a map is malformed")
+	void listWithMalformedMap() {
+	}
+
+	@Test
+	@Override
+	@Disabled("SnakeYaml does not fail when a map has a key with no value")
+	void mapWithKeyAndNoValue() {
+	}
+
+	@Override
+	@Disabled("SnakeYaml does not protect against deeply nested JSON")
+	void listWithRepeatedOpenArray() throws IOException {
+		super.listWithRepeatedOpenArray();
+	}
+
+	@Override
+	@Disabled("SnakeYaml does not protect against malformed keys")
+	void largeMalformed() throws IOException {
+	}
+
+	@Override
+	@Disabled("SnakeYaml does not protect against deeply nested JSON")
+	void deeplyNestedMap() throws IOException {
 	}
 
 }

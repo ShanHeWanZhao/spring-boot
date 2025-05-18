@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import org.junit.jupiter.api.TestTemplate;
 
 import org.springframework.boot.gradle.junit.GradleCompatibility;
 import org.springframework.boot.gradle.tasks.buildinfo.BuildInfo;
-import org.springframework.boot.gradle.testkit.GradleBuild;
+import org.springframework.boot.testsupport.gradle.testkit.GradleBuild;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,9 +42,9 @@ class BuildInfoDslIntegrationTests {
 	GradleBuild gradleBuild;
 
 	@TestTemplate
-	void basicJar() throws IOException {
+	void basicJar() {
 		assertThat(this.gradleBuild.build("bootBuildInfo", "--stacktrace").task(":bootBuildInfo").getOutcome())
-				.isEqualTo(TaskOutcome.SUCCESS);
+			.isEqualTo(TaskOutcome.SUCCESS);
 		Properties properties = buildInfoProperties();
 		assertThat(properties).containsEntry("build.name", this.gradleBuild.getProjectDir().getName());
 		assertThat(properties).containsEntry("build.artifact", this.gradleBuild.getProjectDir().getName());
@@ -53,9 +53,9 @@ class BuildInfoDslIntegrationTests {
 	}
 
 	@TestTemplate
-	void jarWithCustomName() throws IOException {
+	void jarWithCustomName() {
 		assertThat(this.gradleBuild.build("bootBuildInfo", "--stacktrace").task(":bootBuildInfo").getOutcome())
-				.isEqualTo(TaskOutcome.SUCCESS);
+			.isEqualTo(TaskOutcome.SUCCESS);
 		Properties properties = buildInfoProperties();
 		assertThat(properties).containsEntry("build.name", this.gradleBuild.getProjectDir().getName());
 		assertThat(properties).containsEntry("build.artifact", "foo");
@@ -64,9 +64,9 @@ class BuildInfoDslIntegrationTests {
 	}
 
 	@TestTemplate
-	void basicWar() throws IOException {
+	void basicWar() {
 		assertThat(this.gradleBuild.build("bootBuildInfo", "--stacktrace").task(":bootBuildInfo").getOutcome())
-				.isEqualTo(TaskOutcome.SUCCESS);
+			.isEqualTo(TaskOutcome.SUCCESS);
 		Properties properties = buildInfoProperties();
 		assertThat(properties).containsEntry("build.name", this.gradleBuild.getProjectDir().getName());
 		assertThat(properties).containsEntry("build.artifact", this.gradleBuild.getProjectDir().getName());
@@ -75,9 +75,9 @@ class BuildInfoDslIntegrationTests {
 	}
 
 	@TestTemplate
-	void warWithCustomName() throws IOException {
+	void warWithCustomName() {
 		assertThat(this.gradleBuild.build("bootBuildInfo", "--stacktrace").task(":bootBuildInfo").getOutcome())
-				.isEqualTo(TaskOutcome.SUCCESS);
+			.isEqualTo(TaskOutcome.SUCCESS);
 		Properties properties = buildInfoProperties();
 		assertThat(properties).containsEntry("build.name", this.gradleBuild.getProjectDir().getName());
 		assertThat(properties).containsEntry("build.artifact", "foo");
@@ -86,9 +86,9 @@ class BuildInfoDslIntegrationTests {
 	}
 
 	@TestTemplate
-	void additionalProperties() throws IOException {
+	void additionalProperties() {
 		assertThat(this.gradleBuild.build("bootBuildInfo", "--stacktrace").task(":bootBuildInfo").getOutcome())
-				.isEqualTo(TaskOutcome.SUCCESS);
+			.isEqualTo(TaskOutcome.SUCCESS);
 		Properties properties = buildInfoProperties();
 		assertThat(properties).containsEntry("build.name", this.gradleBuild.getProjectDir().getName());
 		assertThat(properties).containsEntry("build.artifact", this.gradleBuild.getProjectDir().getName());
@@ -99,9 +99,9 @@ class BuildInfoDslIntegrationTests {
 	}
 
 	@TestTemplate
-	void classesDependency() throws IOException {
+	void classesDependency() {
 		assertThat(this.gradleBuild.build("classes", "--stacktrace").task(":bootBuildInfo").getOutcome())
-				.isEqualTo(TaskOutcome.SUCCESS);
+			.isEqualTo(TaskOutcome.SUCCESS);
 	}
 
 	private Properties buildInfoProperties() {

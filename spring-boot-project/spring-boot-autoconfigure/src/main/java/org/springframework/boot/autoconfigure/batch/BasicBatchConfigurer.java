@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import org.springframework.batch.core.launch.support.SimpleJobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.repository.support.JobRepositoryFactoryBean;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.autoconfigure.batch.BatchProperties.Isolation;
 import org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizers;
 import org.springframework.boot.context.properties.PropertyMapper;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -111,7 +112,7 @@ public class BasicBatchConfigurer implements BatchConfigurer, InitializingBean {
 		PropertyMapper map = PropertyMapper.get();
 		JobExplorerFactoryBean factory = new JobExplorerFactoryBean();
 		factory.setDataSource(this.dataSource);
-		map.from(this.properties::getTablePrefix).whenHasText().to(factory::setTablePrefix);
+		map.from(this.properties.getJdbc()::getTablePrefix).whenHasText().to(factory::setTablePrefix);
 		factory.afterPropertiesSet();
 		return factory.getObject();
 	}
@@ -128,7 +129,7 @@ public class BasicBatchConfigurer implements BatchConfigurer, InitializingBean {
 		PropertyMapper map = PropertyMapper.get();
 		map.from(this.dataSource).to(factory::setDataSource);
 		map.from(this::determineIsolationLevel).whenNonNull().to(factory::setIsolationLevelForCreate);
-		map.from(this.properties::getTablePrefix).whenHasText().to(factory::setTablePrefix);
+		map.from(this.properties.getJdbc()::getTablePrefix).whenHasText().to(factory::setTablePrefix);
 		map.from(this::getTransactionManager).to(factory::setTransactionManager);
 		factory.afterPropertiesSet();
 		return factory.getObject();
@@ -139,7 +140,8 @@ public class BasicBatchConfigurer implements BatchConfigurer, InitializingBean {
 	 * @return the isolation level or {@code null} to use the default
 	 */
 	protected String determineIsolationLevel() {
-		return null;
+		Isolation isolation = this.properties.getJdbc().getIsolationLevelForCreate();
+		return (isolation != null) ? isolation.toIsolationName() : null;
 	}
 
 	protected PlatformTransactionManager createTransactionManager() {

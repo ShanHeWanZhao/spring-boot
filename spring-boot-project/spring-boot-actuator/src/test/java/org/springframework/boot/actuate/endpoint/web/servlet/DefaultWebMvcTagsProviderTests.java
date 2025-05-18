@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Andy Wilkinson
  */
-public class DefaultWebMvcTagsProviderTests {
+class DefaultWebMvcTagsProviderTests {
 
 	@Test
 	void whenTagsAreProvidedThenDefaultTagsArePresent() {
@@ -51,7 +51,8 @@ public class DefaultWebMvcTagsProviderTests {
 	void givenSomeContributorsWhenTagsAreProvidedThenDefaultTagsAndContributedTagsArePresent() {
 		Map<String, Tag> tags = asMap(
 				new DefaultWebMvcTagsProvider(Arrays.asList(new TestWebMvcTagsContributor("alpha"),
-						new TestWebMvcTagsContributor("bravo", "charlie"))).getTags(null, null, null, null));
+						new TestWebMvcTagsContributor("bravo", "charlie")))
+					.getTags(null, null, null, null));
 		assertThat(tags).containsOnlyKeys("exception", "method", "outcome", "status", "uri", "alpha", "bravo",
 				"charlie");
 	}
@@ -66,13 +67,14 @@ public class DefaultWebMvcTagsProviderTests {
 	void givenSomeContributorsWhenLongRequestTagsAreProvidedThenDefaultTagsAndContributedTagsArePresent() {
 		Map<String, Tag> tags = asMap(
 				new DefaultWebMvcTagsProvider(Arrays.asList(new TestWebMvcTagsContributor("alpha"),
-						new TestWebMvcTagsContributor("bravo", "charlie"))).getLongRequestTags(null, null));
+						new TestWebMvcTagsContributor("bravo", "charlie")))
+					.getLongRequestTags(null, null));
 		assertThat(tags).containsOnlyKeys("method", "uri", "alpha", "bravo", "charlie");
 	}
 
 	private Map<String, Tag> asMap(Iterable<Tag> tags) {
 		return StreamSupport.stream(tags.spliterator(), false)
-				.collect(Collectors.toMap(Tag::getKey, Function.identity()));
+			.collect(Collectors.toMap(Tag::getKey, Function.identity()));
 	}
 
 	private static final class TestWebMvcTagsContributor implements WebMvcTagsContributor {

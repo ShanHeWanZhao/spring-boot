@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.Map;
 
 import org.springframework.boot.web.error.ErrorAttributeOptions;
-import org.springframework.boot.web.error.ErrorAttributeOptions.Include;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.ModelAndView;
@@ -36,19 +35,12 @@ import org.springframework.web.servlet.ModelAndView;
 public interface ErrorAttributes {
 
 	/**
-	 * Returns a {@link Map} of the error attributes. The map can be used as the model of
-	 * an error page {@link ModelAndView}, or returned as a
-	 * {@link ResponseBody @ResponseBody}.
-	 * @param webRequest the source request
-	 * @param includeStackTrace if stack trace element should be included
-	 * @return a map of error attributes
-	 * @deprecated since 2.3.0 for removal in 2.5.0 in favor of
-	 * {@link #getErrorAttributes(WebRequest, ErrorAttributeOptions)}
+	 * Name of the {@link javax.servlet.http.HttpServletRequest#getAttribute(String)
+	 * request attribute} holding the error resolved by the {@code ErrorAttributes}
+	 * implementation.
+	 * @since 2.5.0
 	 */
-	@Deprecated
-	default Map<String, Object> getErrorAttributes(WebRequest webRequest, boolean includeStackTrace) {
-		return Collections.emptyMap();
-	}
+	String ERROR_ATTRIBUTE = ErrorAttributes.class.getName() + ".error";
 
 	/**
 	 * Returns a {@link Map} of the error attributes. The map can be used as the model of
@@ -60,7 +52,7 @@ public interface ErrorAttributes {
 	 * @since 2.3.0
 	 */
 	default Map<String, Object> getErrorAttributes(WebRequest webRequest, ErrorAttributeOptions options) {
-		return getErrorAttributes(webRequest, options.isIncluded(Include.STACK_TRACE));
+		return Collections.emptyMap();
 	}
 
 	/**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -276,7 +276,7 @@ public class Restarter {
 		Assert.notNull(this.mainClassName, "Unable to find the main class to restart");
 		URL[] urls = this.urls.toArray(new URL[0]);
 		ClassLoaderFiles updatedFiles = new ClassLoaderFiles(this.classLoaderFiles);
-		ClassLoader classLoader = new RestartClassLoader(this.applicationClassLoader, urls, updatedFiles, this.logger);
+		ClassLoader classLoader = new RestartClassLoader(this.applicationClassLoader, urls, updatedFiles);
 		if (this.logger.isDebugEnabled()) {
 			this.logger.debug("Starting application " + this.mainClassName + " with URLs " + Arrays.asList(urls));
 		}
@@ -321,13 +321,13 @@ public class Restarter {
 		System.runFinalization();
 	}
 
-	private void cleanupCaches() throws Exception {
+	private void cleanupCaches() {
 		Introspector.flushCaches();
 		cleanupKnownCaches();
 	}
 
-	private void cleanupKnownCaches() throws Exception {
-		// Whilst not strictly necessary it helps to cleanup soft reference caches
+	private void cleanupKnownCaches() {
+		// Whilst not strictly necessary it helps to clean up soft reference caches
 		// early rather than waiting for memory limits to be reached
 		ResolvableType.clearCache();
 		cleanCachedIntrospectionResultsCache();
@@ -338,13 +338,13 @@ public class Restarter {
 		}
 	}
 
-	private void cleanCachedIntrospectionResultsCache() throws Exception {
+	private void cleanCachedIntrospectionResultsCache() {
 		clear(CachedIntrospectionResults.class, "acceptedClassLoaders");
 		clear(CachedIntrospectionResults.class, "strongClassCache");
 		clear(CachedIntrospectionResults.class, "softClassCache");
 	}
 
-	private void clearAnnotationUtilsCache() throws Exception {
+	private void clearAnnotationUtilsCache() {
 		try {
 			AnnotationUtils.clearCache();
 		}
@@ -365,7 +365,7 @@ public class Restarter {
 		}
 	}
 
-	private void clear(Class<?> type, String fieldName) throws Exception {
+	private void clear(Class<?> type, String fieldName) {
 		try {
 			Field field = type.getDeclaredField(fieldName);
 			field.setAccessible(true);
@@ -423,7 +423,7 @@ public class Restarter {
 	}
 
 	void prepare(ConfigurableApplicationContext applicationContext) {
-		if (applicationContext != null && applicationContext.getParent() != null) {
+		if (!this.enabled || (applicationContext != null && applicationContext.getParent() != null)) {
 			return;
 		}
 		if (applicationContext instanceof GenericApplicationContext) {

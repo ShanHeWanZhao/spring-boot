@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-
-import reactor.netty.http.client.HttpClientRequest;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.client.AbstractClientHttpRequestFactoryWrapper;
@@ -396,7 +394,7 @@ public class RestTemplateBuilder {
 
 	/**
 	 * Add a default header that will be set if not already present on the outgoing
-	 * {@link HttpClientRequest}.
+	 * {@link ClientHttpRequest}.
 	 * @param name the name of the header
 	 * @param values the header values
 	 * @return a new builder instance
@@ -663,8 +661,9 @@ public class RestTemplateBuilder {
 		if (this.basicAuthentication == null && this.defaultHeaders.isEmpty() && this.requestCustomizers.isEmpty()) {
 			return;
 		}
-		restTemplate.getClientHttpRequestInitializers().add(new RestTemplateBuilderClientHttpRequestInitializer(
-				this.basicAuthentication, this.defaultHeaders, this.requestCustomizers));
+		restTemplate.getClientHttpRequestInitializers()
+			.add(new RestTemplateBuilderClientHttpRequestInitializer(this.basicAuthentication, this.defaultHeaders,
+					this.requestCustomizers));
 	}
 
 	@SuppressWarnings("unchecked")

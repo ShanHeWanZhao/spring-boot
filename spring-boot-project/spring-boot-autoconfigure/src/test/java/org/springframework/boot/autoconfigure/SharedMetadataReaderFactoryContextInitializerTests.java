@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
@@ -40,8 +39,8 @@ import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link SharedMetadataReaderFactoryContextInitializer}.
@@ -57,7 +56,7 @@ class SharedMetadataReaderFactoryContextInitializerTests {
 		SpringApplication application = new SpringApplication(TestConfig.class);
 		application.setWebApplicationType(WebApplicationType.NONE);
 		List<ApplicationContextInitializer<?>> initializers = (List<ApplicationContextInitializer<?>>) ReflectionTestUtils
-				.getField(application, "initializers");
+			.getField(application, "initializers");
 		// Simulate what would happen if an initializer was added using spring.factories
 		// and happened to be loaded first
 		initializers.add(0, new Initializer());
@@ -73,7 +72,8 @@ class SharedMetadataReaderFactoryContextInitializerTests {
 		ConfigurationClassPostProcessor configurationAnnotationPostProcessor = mock(
 				ConfigurationClassPostProcessor.class);
 		BeanDefinition beanDefinition = BeanDefinitionBuilder
-				.genericBeanDefinition(ConfigurationClassPostProcessor.class).getBeanDefinition();
+			.genericBeanDefinition(ConfigurationClassPostProcessor.class)
+			.getBeanDefinition();
 		((AbstractBeanDefinition) beanDefinition).setInstanceSupplier(() -> configurationAnnotationPostProcessor);
 		registry.registerBeanDefinition(AnnotationConfigUtils.CONFIGURATION_ANNOTATION_PROCESSOR_BEAN_NAME,
 				beanDefinition);
@@ -84,10 +84,10 @@ class SharedMetadataReaderFactoryContextInitializerTests {
 		ConfigurationClassPostProcessor bean = context.getBean(ConfigurationClassPostProcessor.class);
 		assertThat(bean).isSameAs(configurationAnnotationPostProcessor);
 		ArgumentCaptor<MetadataReaderFactory> metadataReaderFactory = ArgumentCaptor
-				.forClass(MetadataReaderFactory.class);
-		verify(configurationAnnotationPostProcessor).setMetadataReaderFactory(metadataReaderFactory.capture());
+			.forClass(MetadataReaderFactory.class);
+		then(configurationAnnotationPostProcessor).should().setMetadataReaderFactory(metadataReaderFactory.capture());
 		assertThat(metadataReaderFactory.getValue())
-				.isInstanceOf(ConcurrentReferenceCachingMetadataReaderFactory.class);
+			.isInstanceOf(ConcurrentReferenceCachingMetadataReaderFactory.class);
 	}
 
 	static class TestConfig {
@@ -106,11 +106,11 @@ class SharedMetadataReaderFactoryContextInitializerTests {
 	static class PostProcessor implements BeanDefinitionRegistryPostProcessor {
 
 		@Override
-		public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+		public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
 		}
 
 		@Override
-		public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+		public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
 			for (String name : registry.getBeanDefinitionNames()) {
 				BeanDefinition definition = registry.getBeanDefinition(name);
 				definition.setAttribute("seen", true);
