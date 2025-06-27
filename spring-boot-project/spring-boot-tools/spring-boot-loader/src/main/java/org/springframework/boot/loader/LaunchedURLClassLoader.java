@@ -131,12 +131,13 @@ public class LaunchedURLClassLoader extends URLClassLoader {
 			catch (ClassNotFoundException ex) {
 			}
 		}
-		if (this.exploded) {
+		if (this.exploded) { // exploded模式，不是fat jar。可直接用传统的方式查找class
 			return super.loadClass(name, resolve);
 		}
 		Handler.setUseFastConnectionExceptions(true);
 		try {
 			try {
+				// 遍历所有可用的jar，并匹配到当前的name，最后定义为可用的Package
 				definePackageIfNecessary(name);
 			}
 			catch (IllegalArgumentException ex) {
@@ -148,6 +149,7 @@ public class LaunchedURLClassLoader extends URLClassLoader {
 					throw new AssertionError("Package " + name + " has already been defined but it could not be found");
 				}
 			}
+			// 到这里就代表class的源文件找到了，调用父类的加载
 			return super.loadClass(name, resolve);
 		}
 		finally {
@@ -193,8 +195,9 @@ public class LaunchedURLClassLoader extends URLClassLoader {
 	private void definePackageIfNecessary(String className) {
 		int lastDot = className.lastIndexOf('.');
 		if (lastDot >= 0) {
+			// 截掉class的simpleName,只留下包名
 			String packageName = className.substring(0, lastDot);
-			if (getPackage(packageName) == null) {
+			if (getPackage(packageName) == null) { // 缓存中没查到，就define
 				try {
 					definePackage(className, packageName);
 				}
@@ -215,15 +218,17 @@ public class LaunchedURLClassLoader extends URLClassLoader {
 	private void definePackage(String className, String packageName) {
 		try {
 			AccessController.doPrivileged((PrivilegedExceptionAction<Object>) () -> {
+				// 例：site/shanzhao/common/bean/
 				String packageEntryName = packageName.replace('.', '/') + "/";
+				// 例：site/shanzhao/common/bean/Demo.class
 				String classEntryName = className.replace('.', '/') + ".class";
-				for (URL url : getURLs()) {
+				for (URL url : getURLs()) { // 遍历jar包形式的URL（即fat jar内的所有BOOT-INF/lib/*.jar）
 					try {
 						URLConnection connection = url.openConnection();
 						if (connection instanceof JarURLConnection) {
 							JarFile jarFile = ((JarURLConnection) connection).getJarFile();
 							if (jarFile.getEntry(classEntryName) != null && jarFile.getEntry(packageEntryName) != null
-									&& jarFile.getManifest() != null) {
+									&& jarFile.getManifest() != null) { // 找到了，定义这个Package并缓存
 								definePackage(packageName, jarFile.getManifest(), url);
 								return null;
 							}

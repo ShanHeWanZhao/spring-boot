@@ -52,9 +52,12 @@ public abstract class Launcher {
 		if (!isExploded()) {
 			JarFile.registerUrlProtocolHandler();
 		}
+		// 创建LaunchedURLClassLoader类加载器
 		ClassLoader classLoader = createClassLoader(getClassPathArchivesIterator());
 		String jarMode = System.getProperty("jarmode");
+		// 获取Start-Class，也就是我们主程序的启动类
 		String launchClass = (jarMode != null && !jarMode.isEmpty()) ? JAR_MODE_LAUNCHER : getMainClass();
+		// 设置LaunchedURLClassLoader到当前thread的环境中，以便在后续加载class时使用到，并启动主启动类
 		launch(args, launchClass, classLoader);
 	}
 
@@ -152,6 +155,7 @@ public abstract class Launcher {
 		ProtectionDomain protectionDomain = getClass().getProtectionDomain();
 		CodeSource codeSource = protectionDomain.getCodeSource();
 		URI location = (codeSource != null) ? codeSource.getLocation().toURI() : null;
+		// path就是当前启动jar包的全路径
 		String path = (location != null) ? location.getSchemeSpecificPart() : null;
 		if (path == null) {
 			throw new IllegalStateException("Unable to determine code source archive");
@@ -160,6 +164,7 @@ public abstract class Launcher {
 		if (!root.exists()) {
 			throw new IllegalStateException("Unable to determine code source archive from " + root);
 		}
+		// jar包启动使用JarFileArchive
 		return (root.isDirectory() ? new ExplodedArchive(root) : new JarFileArchive(root));
 	}
 
