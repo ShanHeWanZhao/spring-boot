@@ -33,9 +33,11 @@ import org.springframework.boot.loader.archive.Archive.EntryFilter;
 public class JarLauncher extends ExecutableArchiveLauncher {
 
 	static final EntryFilter NESTED_ARCHIVE_ENTRY_FILTER = (entry) -> {
+		// 如果是文件夹，仅匹配出BOOT-INF/classes/
 		if (entry.isDirectory()) {
 			return entry.getName().equals("BOOT-INF/classes/");
 		}
+		// 文件则匹配出BOOT-INF/lib/目录下的所有jar包
 		return entry.getName().startsWith("BOOT-INF/lib/");
 	};
 

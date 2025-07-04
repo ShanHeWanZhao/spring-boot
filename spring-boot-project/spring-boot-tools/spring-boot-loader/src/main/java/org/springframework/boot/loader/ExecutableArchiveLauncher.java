@@ -116,9 +116,18 @@ public abstract class ExecutableArchiveLauncher extends Launcher {
 		return 50;
 	}
 
+	/**
+	 * fatjar模式启动下，返回如下Archive
+	 *  1. BOOT-INF/lib/ 下所有jar分别各自对应一个Archive
+	 *  2. BOOT-INF/classes 文件夹对应一个Archive
+	 */
 	@Override
 	protected Iterator<Archive> getClassPathArchivesIterator() throws Exception {
+		// 以 BOOT-INF/ 开头
 		Archive.EntryFilter searchFilter = this::isSearchCandidate;
+		// 当存在 BOOT-INF/classpath.idx 文件时，跳过其中已列出的 jar 文件，不再走常规的扫描构建 Archive 路径。
+		// 会在后续步骤里（ExecutableArchiveLauncher.createClassLoader方法）直接通过 BOOT-INF/classpath.idx 文件把这些jar转成URL加入classpath，从而提升启动效率。
+		// 重点注意：只有在exploded模式下（解压了），才会使用BOOT-INF/classpath.idx。以java -jar启动使用的JarFileArchive是不会用到 BOOT-INF/classpath.idx 文件的
 		Iterator<Archive> archives = this.archive.getNestedArchives(searchFilter,
 				(entry) -> isNestedArchive(entry) && !isEntryIndexed(entry));
 		if (isPostProcessingClassPathArchives()) {

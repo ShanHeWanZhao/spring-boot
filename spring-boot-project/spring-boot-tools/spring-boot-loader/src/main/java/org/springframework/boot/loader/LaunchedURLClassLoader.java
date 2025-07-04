@@ -149,7 +149,7 @@ public class LaunchedURLClassLoader extends URLClassLoader {
 					throw new AssertionError("Package " + name + " has already been defined but it could not be found");
 				}
 			}
-			// 到这里就代表class的源文件找到了，调用父类的加载
+			// 直接用父类方法loadClass
 			return super.loadClass(name, resolve);
 		}
 		finally {

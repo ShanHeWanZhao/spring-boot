@@ -50,14 +50,16 @@ public abstract class Launcher {
 	 */
 	protected void launch(String[] args) throws Exception {
 		if (!isExploded()) {
+			// fatjar模式启动，注册一个 java.protocol.handler.pkgs=org.springframework.boot.loader 的系统属性
+			// 以便让jar protocol的URL使用org.springframework.boot.loader.jar.Handler来创建URLConnection
 			JarFile.registerUrlProtocolHandler();
 		}
-		// 创建LaunchedURLClassLoader类加载器
+		// 遍历并筛选 fatjar 内部的 BOOT-INF/lib 和 BOOT-INF/classes，构建 URL 列表并创建LaunchedURLClassLoader
 		ClassLoader classLoader = createClassLoader(getClassPathArchivesIterator());
 		String jarMode = System.getProperty("jarmode");
 		// 获取Start-Class，也就是我们主程序的启动类
 		String launchClass = (jarMode != null && !jarMode.isEmpty()) ? JAR_MODE_LAUNCHER : getMainClass();
-		// 设置LaunchedURLClassLoader到当前thread的环境中，以便在后续加载class时使用到，并启动主启动类
+		// 绑定LaunchedURLClassLoader到当前thread（即main线程）里，以便在后续加载class时使用到。并启动项目的主启动类
 		launch(args, launchClass, classLoader);
 	}
 
