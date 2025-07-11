@@ -103,6 +103,7 @@ public final class ImportCandidates implements Iterable<String> {
 			List<String> candidates = new ArrayList<>();
 			String line;
 			while ((line = reader.readLine()) != null) {
+				// #为注释，跳过当前行#后部分的内容
 				line = stripComment(line);
 				line = line.trim();
 				if (line.isEmpty()) {

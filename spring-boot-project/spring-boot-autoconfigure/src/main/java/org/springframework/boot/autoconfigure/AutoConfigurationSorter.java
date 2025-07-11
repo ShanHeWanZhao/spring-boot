@@ -59,6 +59,7 @@ class AutoConfigurationSorter {
 		// Initially sort alphabetically
 		Collections.sort(orderedClassNames);
 		// Then sort by order
+		// 先按@AutoConfigureOrder排序
 		orderedClassNames.sort((o1, o2) -> {
 			int i1 = classes.get(o1).getOrder();
 			int i2 = classes.get(o2).getOrder();
@@ -70,30 +71,46 @@ class AutoConfigurationSorter {
 	}
 
 	private List<String> sortByAnnotation(AutoConfigurationClasses classes, List<String> classNames) {
+		// 待排列表
 		List<String> toSort = new ArrayList<>(classNames);
+		// 加入所有参与排序的相关类。比如说某个配置类的@AutoConfigureBefore中的value不是配置类或者被excluded了，此时也要加入进来，使拓扑排序的链路更完整
 		toSort.addAll(classes.getAllNames());
+		// 已排序列表
 		Set<String> sorted = new LinkedHashSet<>();
+		// 处理中（检测循环依赖）
 		Set<String> processing = new LinkedHashSet<>();
+		// 开始排序
 		while (!toSort.isEmpty()) {
 			doSortByAfterAnnotation(classes, toSort, sorted, processing, null);
 		}
+		// 排序完毕，按顺序只保留classNames相关类
 		sorted.retainAll(classNames);
 		return new ArrayList<>(sorted);
 	}
 
+	/**
+	 * 拓扑排序的dfs实现方案（非统计入度方式实现）
+	 * 排序规则：
+	 *   1. 若类 A 上标注 @AutoConfigureAfter(B)，则 B 必须排在 A 之前
+	 *   2. 若类 A 上标注 @AutoConfigureBefore(B)，则 A 必须排在 B 之前
+	 */
 	private void doSortByAfterAnnotation(AutoConfigurationClasses classes, List<String> toSort, Set<String> sorted,
 			Set<String> processing, String current) {
 		if (current == null) {
 			current = toSort.remove(0);
 		}
 		processing.add(current);
+		// 依次处理每个current类的依赖类（也就是说需要确保current 排在 after 之后）
 		for (String after : classes.getClassesRequestedAfter(current)) {
+			// 拓扑排序中判环操作，避免循环依赖
 			checkForCycles(processing, current, after);
+			// 只有当该类还没被排序，且在待排序列表中，才递归处理依赖类after
 			if (!sorted.contains(after) && toSort.contains(after)) {
 				doSortByAfterAnnotation(classes, toSort, sorted, processing, after);
 			}
 		}
 		processing.remove(current);
+		// current的依赖都已处理完毕，此时可以放入current了
 		sorted.add(current);
 	}
 
@@ -139,8 +156,13 @@ class AutoConfigurationSorter {
 			return this.classes.get(className);
 		}
 
+		/**
+		 * 获取某个类的所有排序依赖类（即必须排在className之前的类）
+		 */
 		Set<String> getClassesRequestedAfter(String className) {
+			// @AutoConfigureAfter处理
 			Set<String> classesRequestedAfter = new LinkedHashSet<>(get(className).getAfter());
+			// @AutoConfigureBefore只能遍历所有的配置类，依次判断是否包含当前的className
 			this.classes.forEach((name, autoConfigurationClass) -> {
 				if (autoConfigurationClass.getBefore().contains(className)) {
 					classesRequestedAfter.add(name);
@@ -210,6 +232,9 @@ class AutoConfigurationSorter {
 			return (attributes != null) ? (Integer) attributes.get("value") : AutoConfigureOrder.DEFAULT_ORDER;
 		}
 
+		/**
+		 * 如果有spring-boot-autoconfigure-processor组件生成的配置文件，则会优先使用，这种比asm解析注解更快
+		 */
 		private boolean wasProcessed() {
 			return (this.autoConfigurationMetadata != null
 					&& this.autoConfigurationMetadata.wasProcessed(this.className));
