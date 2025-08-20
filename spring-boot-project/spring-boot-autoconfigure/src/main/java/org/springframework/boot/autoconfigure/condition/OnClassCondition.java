@@ -90,10 +90,12 @@ class OnClassCondition extends FilteringSpringBootCondition {
 	public ConditionOutcome getMatchOutcome(ConditionContext context, AnnotatedTypeMetadata metadata) {
 		ClassLoader classLoader = context.getClassLoader();
 		ConditionMessage matchMessage = ConditionMessage.empty();
+		// 解析@ConditionalOnClass的value和name
 		List<String> onClasses = getCandidates(metadata, ConditionalOnClass.class);
 		if (onClasses != null) {
+			// ClassNameFilter.MISSING过滤器得到的结果表示 在指定ClassLoader下不存在对应的class
 			List<String> missing = filter(onClasses, ClassNameFilter.MISSING, classLoader);
-			if (!missing.isEmpty()) {
+			if (!missing.isEmpty()) { // 任意一个class不存在，则不满足@ConditionalOnClass逻辑，返回noMatch
 				return ConditionOutcome.noMatch(ConditionMessage.forCondition(ConditionalOnClass.class)
 					.didNotFind("required class", "required classes")
 					.items(Style.QUOTE, missing));
@@ -102,10 +104,12 @@ class OnClassCondition extends FilteringSpringBootCondition {
 				.found("required class", "required classes")
 				.items(Style.QUOTE, filter(onClasses, ClassNameFilter.PRESENT, classLoader));
 		}
+		// 解析@ConditionalOnMissingClass的value和name
 		List<String> onMissingClasses = getCandidates(metadata, ConditionalOnMissingClass.class);
 		if (onMissingClasses != null) {
+			// ClassNameFilter.PRESENT过滤器得到的结果表示 在指定ClassLoader下存在对应的class
 			List<String> present = filter(onMissingClasses, ClassNameFilter.PRESENT, classLoader);
-			if (!present.isEmpty()) {
+			if (!present.isEmpty()) { // 任意一个class存在，则不满足@ConditionalOnMissingClass逻辑，返回noMatch
 				return ConditionOutcome.noMatch(ConditionMessage.forCondition(ConditionalOnMissingClass.class)
 					.found("unwanted class", "unwanted classes")
 					.items(Style.QUOTE, present));

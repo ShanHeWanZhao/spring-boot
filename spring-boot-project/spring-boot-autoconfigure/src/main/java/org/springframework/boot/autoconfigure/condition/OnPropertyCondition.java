@@ -70,12 +70,12 @@ class OnPropertyCondition extends SpringBootCondition {
 		List<String> missingProperties = new ArrayList<>();
 		List<String> nonMatchingProperties = new ArrayList<>();
 		spec.collectProperties(resolver, missingProperties, nonMatchingProperties);
-		if (!missingProperties.isEmpty()) {
+		if (!missingProperties.isEmpty()) {// 没对应的属性，且matchIfMissing=false。返回noMatch
 			return ConditionOutcome.noMatch(ConditionMessage.forCondition(ConditionalOnProperty.class, spec)
 				.didNotFind("property", "properties")
 				.items(Style.QUOTE, missingProperties));
 		}
-		if (!nonMatchingProperties.isEmpty()) {
+		if (!nonMatchingProperties.isEmpty()) { // 有对应的属性，但其value不匹配。也返回noMatch
 			return ConditionOutcome.noMatch(ConditionMessage.forCondition(ConditionalOnProperty.class, spec)
 				.found("different value in property", "different value in properties")
 				.items(Style.QUOTE, nonMatchingProperties));
@@ -96,6 +96,7 @@ class OnPropertyCondition extends SpringBootCondition {
 
 		Spec(AnnotationAttributes annotationAttributes) {
 			String prefix = annotationAttributes.getString("prefix").trim();
+			// prefix末尾增加.
 			if (StringUtils.hasText(prefix) && !prefix.endsWith(".")) {
 				prefix = prefix + ".";
 			}
@@ -117,13 +118,16 @@ class OnPropertyCondition extends SpringBootCondition {
 
 		private void collectProperties(PropertyResolver resolver, List<String> missing, List<String> nonMatching) {
 			for (String name : this.names) {
+				// 对每个属性添加prefix
 				String key = this.prefix + name;
 				if (resolver.containsProperty(key)) {
+					// 有这个属性，根据value是否匹配校验
 					if (!isMatch(resolver.getProperty(key), this.havingValue)) {
 						nonMatching.add(name);
 					}
 				}
 				else {
+					// 没这个属性，则根据matchIfMissing来判断
 					if (!this.matchIfMissing) {
 						missing.add(name);
 					}

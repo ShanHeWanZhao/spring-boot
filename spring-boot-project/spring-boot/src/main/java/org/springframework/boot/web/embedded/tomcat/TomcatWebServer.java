@@ -113,13 +113,12 @@ public class TomcatWebServer implements WebServer {
 				Context context = findContext();
 				context.addLifecycleListener((event) -> {
 					if (context.equals(event.getSource()) && Lifecycle.START_EVENT.equals(event.getType())) {
-						// Remove service connectors so that protocol binding doesn't
-						// happen when the service is started.
+						// start时移除connector组件，避免过早绑定端口
 						removeServiceConnectors();
 					}
 				});
 
-				// Start the server to trigger initialization listeners
+				// 启动tomcat
 				this.tomcat.start();
 
 				// We can re-throw failure exception directly in the main thread

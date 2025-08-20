@@ -105,11 +105,13 @@ public abstract class AbstractNestedCondition extends SpringBootCondition implem
 
 		private final MetadataReaderFactory readerFactory;
 
+		// key为某个内部类的AnnotationMetadata，value为其使用的Condition集合
 		private final Map<AnnotationMetadata, List<Condition>> memberConditions;
 
 		MemberConditions(ConditionContext context, ConfigurationPhase phase, String className) {
 			this.context = context;
 			this.readerFactory = new SimpleMetadataReaderFactory(context.getResourceLoader());
+			// 当前className里的所有内部类
 			String[] members = getMetadata(className).getMemberClassNames();
 			this.memberConditions = getMemberConditions(members, phase, className);
 		}
